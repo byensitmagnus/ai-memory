@@ -137,6 +137,22 @@ Missing harness? `sync.js` writes to a list called `HOME_TARGETS`. Adding a four
 
 ---
 
+## Tests
+
+```bash
+npm test
+```
+
+16 tests, no dependencies, using Node's built-in runner. Each one spawns the real `sync.js` against a
+throwaway home directory, so what is tested is what runs on your machine.
+
+They cover the things that would fail silently: byte-identity across the three targets, block order,
+the truncation cap, session-import watermarking, wrapper stripping, and — most importantly — that the
+installer merges into your `settings.json` instead of replacing it and that `--uninstall` takes only
+its own hooks with it.
+
+---
+
 ## What is deliberately not here
 
 - **No agents, skills or rules.** Those are opinions, and good ones already exist. 44 of the skills in
