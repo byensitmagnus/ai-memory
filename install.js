@@ -6,6 +6,7 @@
  *   node install.js              install or update
  *   node install.js --check      show what would change, touch nothing
  *   node install.js --uninstall  unregister hooks, leave your content alone
+ *   node install.js --doctor     read-only installation health check
  *
  * Node 18+. No dependencies. Everything happens inside your home directory.
  */
@@ -24,17 +25,31 @@ const GROK = path.join(HOME, '.grok');
 
 const CHECK = process.argv.includes('--check');
 const UNINSTALL = process.argv.includes('--uninstall');
+const DOCTOR = process.argv.includes('--doctor');
 
 /** Every hook we register runs this. It is also how --uninstall finds them again. */
 const MARKER = '.ai-memory/sync.js';
 const COMMAND = `node "${path.join(AIMEM, 'sync.js').replace(/\\/g, '/')}"`;
-const EVENTS = ['SessionStart', 'Stop', 'SessionEnd'];
+const CLAUDE_EVENTS = ['SessionStart', 'Stop', 'SessionEnd'];
+// Codex currently exposes SessionStart and Stop, but not Claude's SessionEnd.
+// Keeping this list separate avoids installing a hook Codex will never run.
+const CODEX_EVENTS = ['SessionStart', 'Stop'];
+const GROK_EVENTS = ['SessionStart', 'Stop', 'SessionEnd'];
 
 let changed = 0;
 const notes = [];
 const log = (m) => console.log(`[ai-memory] ${m}`);
 const stamp = () => new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 const read = (p) => { try { return fs.readFileSync(p); } catch { return null; } };
+
+if (DOCTOR) {
+  try {
+    execFileSync(process.execPath, [path.join(AIMEM, 'doctor.js')], { stdio: 'inherit' });
+  } catch (error) {
+    process.exitCode = error.status || 1;
+  }
+  process.exit();
+}
 
 function write(dest, content, { backup = false } = {}) {
   const buf = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
@@ -61,11 +76,18 @@ function readJson(p, fallback) {
  * Adds our hook to an existing settings object without disturbing anything else.
  * Both Claude Code and Codex use the same shape, so one function covers both.
  */
-function registerHooks(cfg, timeout) {
+function hasOurHook(command) {
+  const value = String(command || '');
+  // Older installations used a tiny node -e wrapper with the path split into
+  // two string literals. Recognise it so an update does not duplicate hooks.
+  return value.includes(MARKER) || (value.includes('.ai-memory') && value.includes('sync.js'));
+}
+
+function registerHooks(cfg, timeout, events) {
   cfg.hooks = cfg.hooks || {};
-  for (const ev of EVENTS) {
+  for (const ev of events) {
     const list = Array.isArray(cfg.hooks[ev]) ? cfg.hooks[ev] : [];
-    const already = list.some((g) => (g.hooks || []).some((h) => String(h.command || '').includes(MARKER)));
+    const already = list.some((g) => (g.hooks || []).some((h) => hasOurHook(h.command)));
     if (already) continue;
     list.push({ matcher: '*', hooks: [{ type: 'command', command: COMMAND, timeout }] });
     cfg.hooks[ev] = list;
@@ -86,10 +108,10 @@ function unregisterHooks(cfg) {
   return cfg;
 }
 
-function patchSettings(file, timeout, label) {
+function patchSettings(file, timeout, label, events = CLAUDE_EVENTS) {
   const cfg = readJson(file, {});
   if (cfg === null) return;
-  const next = UNINSTALL ? unregisterHooks(cfg) : registerHooks(cfg, timeout);
+  const next = UNINSTALL ? unregisterHooks(cfg) : registerHooks(cfg, timeout, events);
   if (write(file, JSON.stringify(next, null, 2) + '\n', { backup: true })) {
     log(`${UNINSTALL ? 'unregistered' : 'registered'} hooks in ${label}`);
   }
@@ -99,8 +121,8 @@ function patchSettings(file, timeout, label) {
 log(CHECK ? 'dry run — nothing will be written' : `${UNINSTALL ? 'uninstalling from' : 'installing to'} ${HOME}`);
 
 if (UNINSTALL) {
-  patchSettings(path.join(CLAUDE, 'settings.json'), 30, '~/.claude/settings.json');
-  if (fs.existsSync(CODEX)) patchSettings(path.join(CODEX, 'hooks.json'), 30, '~/.codex/hooks.json');
+  patchSettings(path.join(CLAUDE, 'settings.json'), 30, '~/.claude/settings.json', CLAUDE_EVENTS);
+  if (fs.existsSync(CODEX)) patchSettings(path.join(CODEX, 'hooks.json'), 30, '~/.codex/hooks.json', CODEX_EVENTS);
   const grokHook = path.join(GROK, 'hooks', 'ai-memory.json');
   if (fs.existsSync(grokHook) && !CHECK) { fs.rmSync(grokHook, { force: true }); changed++; log('removed ~/.grok/hooks/ai-memory.json'); }
   console.log('');
@@ -113,7 +135,7 @@ if (UNINSTALL) {
 }
 
 // 1) Engine ------------------------------------------------------------------
-for (const f of ['sync.js', 'sync-claude-to-codex.js', 'codex-notify.js']) {
+for (const f of ['sync.js', 'sync-claude-to-codex.js', 'codex-notify.js', 'doctor.js']) {
   write(path.join(AIMEM, f), fs.readFileSync(path.join(REPO, 'src', f)));
 }
 
@@ -127,10 +149,10 @@ for (const f of ['INSTRUCTIONS.md', 'CONTEXT.md', 'MEMORY.md']) {
 }
 
 // 3) Hooks --------------------------------------------------------------------
-patchSettings(path.join(CLAUDE, 'settings.json'), 30, '~/.claude/settings.json');
+patchSettings(path.join(CLAUDE, 'settings.json'), 30, '~/.claude/settings.json', CLAUDE_EVENTS);
 
 if (fs.existsSync(CODEX)) {
-  patchSettings(path.join(CODEX, 'hooks.json'), 30, '~/.codex/hooks.json');
+  patchSettings(path.join(CODEX, 'hooks.json'), 30, '~/.codex/hooks.json', CODEX_EVENTS);
   const cfg = (read(path.join(CODEX, 'config.toml')) || Buffer.from('')).toString('utf8');
   if (!/^\s*hooks\s*=\s*true/m.test(cfg)) {
     notes.push('Codex: hooks must be enabled. Add `hooks = true` under `[features]` in ~/.codex/config.toml');
@@ -140,7 +162,7 @@ if (fs.existsSync(CODEX)) {
 }
 
 if (fs.existsSync(GROK)) {
-  const hooks = { hooks: Object.fromEntries(EVENTS.map((ev) => [ev, [{ hooks: [{ type: 'command', command: COMMAND, timeout: 30 }] }]])) };
+  const hooks = { hooks: Object.fromEntries(GROK_EVENTS.map((ev) => [ev, [{ hooks: [{ type: 'command', command: COMMAND, timeout: 30 }] }]])) };
   write(path.join(GROK, 'hooks', 'ai-memory.json'), JSON.stringify(hooks, null, 2) + '\n', { backup: true });
   const cfg = (read(path.join(GROK, 'config.toml')) || Buffer.from('')).toString('utf8');
   if (!/agents\s*=\s*false/.test(cfg)) {

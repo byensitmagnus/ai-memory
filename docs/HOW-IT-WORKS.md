@@ -1,15 +1,16 @@
 # How it works
 
-950 lines, three files, no dependencies. This document is so you can audit it before you let it run
+Four small scripts, no dependencies. This document is so you can audit it before you let it run
 on every session start.
 
-## The three scripts
+## The four scripts
 
 | File | Lines | Job |
 |---|---|---|
 | `sync.js` | 468 | Build the package, write it to three targets, import sessions |
 | `sync-claude-to-codex.js` | 459 | Mirror skills/agents/commands between harnesses |
 | `codex-notify.js` | 21 | Optional Codex `notify` shim so sync also runs on turn-end |
+| `doctor.js` | small | Read-only check of sources, generated targets and bridged skills |
 
 `sync.js` requires `sync-claude-to-codex.js` and calls it first, so the skill inventory is fresh
 before the package is rendered.
@@ -61,7 +62,9 @@ Grok stores a `summary.json` per session but keeps prompts in a workspace-level
 `prompt_history.jsonl`, so the importer joins them on `session_id` and skips `is_bash` entries.
 
 Both are written as `~/.claude/session-data/<date>-<source>-<id>-session.tmp` in the same format,
-which is what makes a single renderer work for all three harnesses.
+which is what makes a single renderer work for all three harnesses. Their
+import watermarks live in the machine-local `~/.ai-memory-runtime/` directory,
+so a Syncthing-backed source folder cannot make another machine skip sessions.
 
 ## Failure behaviour
 

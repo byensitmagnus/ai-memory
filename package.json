@@ -1,11 +1,12 @@
 {
   "name": "ai-memory",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "One identical instruction file for Claude Code, Codex and Grok - plus session memory that crosses between them.",
   "license": "MIT",
   "repository": "github:byensitmagnus/ai-memory",
   "engines": { "node": ">=18" },
   "scripts": {
-    "test": "node --test test/sync.test.js"
+    "test": "node --test test/sync.test.js",
+    "doctor": "node install.js --doctor"
   }
 }

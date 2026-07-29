@@ -37,6 +37,7 @@ function run(script, args = []) {
 
 const sync = () => run(p('.ai-memory', 'sync.js'));
 const install = (args = []) => run(path.join(REPO, 'install.js'), args);
+const doctor = () => run(p('.ai-memory', 'doctor.js'));
 
 beforeEach(() => {
   HOME = path.join(ROOT, `home-${++n}`);
@@ -93,6 +94,23 @@ test('running twice changes nothing', () => {
   assert.deepStrictEqual(after, before, 'a file was rewritten with identical content');
 });
 
+test('doctor verifies a complete, byte-identical installation without writing', () => {
+  install();
+  const before = fs.statSync(p('.claude', 'CLAUDE.md')).mtimeMs;
+  const output = doctor();
+  const after = fs.statSync(p('.claude', 'CLAUDE.md')).mtimeMs;
+  assert.ok(output.includes('100% ALIGNED'), 'doctor did not report alignment');
+  assert.strictEqual(after, before, 'doctor must stay read-only');
+});
+
+test('doctor accepts bridged skill links as real skills', () => {
+  install();
+  put(p('.claude', 'skills', 'demo', 'SKILL.md'), '# demo\n');
+  sync();
+  const output = doctor();
+  assert.ok(output.includes('PASS  Skill-bridge'), 'doctor rejected the bridged skill link');
+});
+
 // --- the memory map ---------------------------------------------------------
 
 test('a project index longer than the cap is truncated', () => {
@@ -145,12 +163,30 @@ test('imports are watermarked so the same session is not read twice', () => {
   install();
   put(p('.codex', 'sessions', 'rollout-c.jsonl'), rollout('/work/shop', 'only once'));
   sync();
-  const state = () => JSON.parse(read(p('.ai-memory', '.sync-state.json')));
+  const state = () => JSON.parse(read(p('.ai-memory-runtime', 'sync-state.json')));
   const first = { files: fs.readdirSync(p('.claude', 'session-data')).length, mark: state().lastCodexImport };
   sync();
   assert.strictEqual(fs.readdirSync(p('.claude', 'session-data')).length, first.files, 'a duplicate was written');
   assert.strictEqual(state().lastCodexImport, first.mark, 'the watermark moved without new input');
   assert.ok(first.mark > 0, 'no watermark was recorded at all');
+});
+
+test('session import watermarks are machine-local, not part of shared memory', () => {
+  install();
+  put(p('.codex', 'sessions', 'rollout-state.jsonl'), rollout('/work/shop', 'keep state local'));
+  sync();
+  assert.ok(fs.existsSync(p('.ai-memory-runtime', 'sync-state.json')), 'no local runtime state was written');
+  assert.ok(!fs.existsSync(p('.ai-memory', '.sync-state.json')), 'watermark leaked into shared ai-memory');
+});
+
+test('a legacy shared watermark is carried forward without deleting its recovery copy', () => {
+  install();
+  fs.rmSync(p('.ai-memory-runtime'), { recursive: true, force: true });
+  put(p('.ai-memory', '.sync-state.json'), JSON.stringify({ lastCodexImport: 123 }));
+  sync();
+  const local = JSON.parse(read(p('.ai-memory-runtime', 'sync-state.json')));
+  assert.ok(local.lastCodexImport >= 123, 'legacy watermark was not migrated');
+  assert.ok(fs.existsSync(p('.ai-memory', '.sync-state.json')), 'legacy recovery copy was deleted');
 });
 
 test('a Grok session is joined with its prompt history', () => {
@@ -193,6 +229,30 @@ test('installing twice does not register the hook twice', () => {
     .flatMap((g) => g.hooks)
     .filter((h) => String(h.command).includes('.ai-memory/sync.js'));
   assert.strictEqual(ours.length, 1, `registered ${ours.length} times`);
+});
+
+test('an older split-path hook is recognised instead of duplicated', () => {
+  const settings = p('.claude', 'settings.json');
+  put(settings, JSON.stringify({
+    hooks: {
+      SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: "node -e \"const p=['.ai-memory','sync.js']\"" }] }],
+    },
+  }));
+  install();
+  const cfg = JSON.parse(read(settings));
+  const ours = cfg.hooks.SessionStart
+    .flatMap((group) => group.hooks)
+    .filter((hook) => String(hook.command).includes('.ai-memory') && String(hook.command).includes('sync.js'));
+  assert.strictEqual(ours.length, 1, `registered ${ours.length} equivalent hooks`);
+});
+
+test('Codex install uses only its supported lifecycle events', () => {
+  fs.mkdirSync(p('.codex'), { recursive: true });
+  install();
+  const hooks = JSON.parse(read(p('.codex', 'hooks.json'))).hooks;
+  assert.ok(hooks.SessionStart, 'SessionStart was not registered for Codex');
+  assert.ok(hooks.Stop, 'Stop was not registered for Codex');
+  assert.ok(!hooks.SessionEnd, 'unsupported Codex SessionEnd was registered');
 });
 
 test('uninstalling removes our hooks and nothing else', () => {

@@ -37,7 +37,12 @@ const GROK_RULES = path.join(HOME, '.grok', 'rules', '00-ai-memory.md');
 const SESSION_STORE = path.join(HOME, '.claude', 'session-data');
 const CODEX_SESSIONS = path.join(HOME, '.codex', 'sessions');
 const GROK_SESSIONS = path.join(HOME, '.grok', 'sessions');
-const STATE_FILE = path.join(MEM_HOME, '.sync-state.json');
+// The source directory may itself be a Syncthing-backed vault. Import
+// watermarks must be machine-local or one computer can cause another to skip
+// its own older session files.
+const RUNTIME_HOME = path.join(HOME, '.ai-memory-runtime');
+const STATE_FILE = path.join(RUNTIME_HOME, 'sync-state.json');
+const LEGACY_STATE_FILE = path.join(MEM_HOME, '.sync-state.json');
 const CLAUDE_PROJECTS = path.join(HOME, '.claude', 'projects');
 
 /** Alle tre værktøjer får samme home-fil (100% ens). */
@@ -52,8 +57,26 @@ function log(msg) { process.stderr.write(`[ai-memory] ${msg}\n`); }
 function readSafe(p) { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } }
 function ensureDir(p) { try { fs.mkdirSync(p, { recursive: true }); } catch {} }
 
-function loadState() { try { return JSON.parse(readSafe(STATE_FILE)) || {}; } catch { return {}; } }
-function saveState(s) { try { fs.writeFileSync(STATE_FILE, JSON.stringify(s, null, 2)); } catch {} }
+function parseState(file) {
+  try { return JSON.parse(readSafe(file)) || {}; } catch { return {}; }
+}
+
+function loadState() {
+  const local = parseState(STATE_FILE);
+  if (Object.keys(local).length) return local;
+  // One-time compatibility path for installations that kept ai-memory inside a
+  // synced vault before runtime state was made local. Leave the old file alone:
+  // it may be the only recovery copy until both machines have upgraded.
+  const legacy = parseState(LEGACY_STATE_FILE);
+  if (Object.keys(legacy).length) log('migrerer tidligere shared sync-state til maskinlokal runtime-state');
+  return legacy;
+}
+function saveState(s) {
+  try {
+    ensureDir(RUNTIME_HOME);
+    fs.writeFileSync(STATE_FILE, JSON.stringify(s, null, 2));
+  } catch {}
+}
 
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
