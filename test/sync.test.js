@@ -86,6 +86,10 @@ test('platform data root uses macOS Application Support when APPDATA is absent',
     appDataRoot('C:\\Users\\tester', { APPDATA: 'D:\\ProfileData' }, 'win32'),
     'D:\\ProfileData',
   );
+  assert.strictEqual(
+    appDataRoot('C:\\Users\\tester', {}, 'win32'),
+    'C:\\Users\\tester\\AppData\\Roaming',
+  );
   assert.deepStrictEqual(
     kimiDesktopRunnerCandidates('/Users/tester/Library/Application Support', '/Users/tester', 'darwin'),
     [

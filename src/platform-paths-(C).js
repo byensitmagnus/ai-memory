@@ -4,17 +4,19 @@ const path = require('path');
 
 function appDataRoot(home, env = process.env, platform = process.platform) {
   if (env.APPDATA) return env.APPDATA;
-  if (platform === 'darwin') return path.join(home, 'Library', 'Application Support');
-  return path.join(home, 'AppData', 'Roaming');
+  const platformPath = platform === 'win32' ? path.win32 : path.posix;
+  if (platform === 'darwin') return platformPath.join(home, 'Library', 'Application Support');
+  return platformPath.join(home, 'AppData', 'Roaming');
 }
 
 function kimiDesktopRunnerCandidates(appData, home, platform = process.platform) {
-  const relative = path.join('daimon-bundle', 'app', 'daimon', 'dist', 'src', 'runner', 'cli.js');
-  const candidates = [path.join(appData, 'kimi-desktop', relative)];
+  const platformPath = platform === 'win32' ? path.win32 : path.posix;
+  const relative = platformPath.join('daimon-bundle', 'app', 'daimon', 'dist', 'src', 'runner', 'cli.js');
+  const candidates = [platformPath.join(appData, 'kimi-desktop', relative)];
   if (platform === 'darwin') {
-    const appRelative = path.join('Kimi.app', 'Contents', 'Resources', 'resources', relative);
-    candidates.push(path.join('/Applications', appRelative));
-    candidates.push(path.join(home, 'Applications', appRelative));
+    const appRelative = platformPath.join('Kimi.app', 'Contents', 'Resources', 'resources', relative);
+    candidates.push(platformPath.join('/Applications', appRelative));
+    candidates.push(platformPath.join(home, 'Applications', appRelative));
   }
   return candidates;
 }
