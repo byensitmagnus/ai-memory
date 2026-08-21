@@ -1,6 +1,6 @@
 {
   "name": "ai-memory",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "One local Obsidian-backed instruction and memory package for Claude Code, Codex, Grok, Kimi, Cursor and ZCode.",
   "license": "MIT",
   "repository": "github:byensitmagnus/ai-memory",

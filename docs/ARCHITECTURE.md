@@ -86,9 +86,10 @@ adapters carry explicit markers so they can be regenerated safely.
 Competing native-memory switches are kept off where they would fork the Brain.
 Grok and ZCode are repaired by the installer. Cursor uses native
 `sessionStart` refresh/context injection plus `afterAgentResponse` write-back;
-its private SQLite setting is checked read-only and must be changed in Cursor's
-UI. Kimi CLI/Desktop use native lifecycle hooks; their shared records contain
-metadata only.
+its effective Memory state is checked read-only. Privacy Mode makes the legacy
+Memory toggle inactive, so `doctor.js` verifies both values instead of treating
+a stale toggle as runtime proof. Kimi CLI/Desktop use native lifecycle hooks;
+their shared records contain metadata only.
 
 ## 4. Project memory protocol
 

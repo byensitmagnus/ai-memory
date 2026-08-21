@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.1 — 2026-08-21
+
+- Fixed the Cursor doctor gate to evaluate effective memory state: Privacy Mode
+  makes Cursor's built-in Memory inactive even when its legacy SQLite toggle is
+  still `true`. The check remains read-only.
+- Added a Node 22+ SQLite regression; the suite now contains 38 integration tests.
+
 ## 2.0.0 — 2026-08-21
 
 - Expanded the byte-identical package to Kimi, Cursor and ZCode alongside

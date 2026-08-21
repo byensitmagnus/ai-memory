@@ -171,6 +171,24 @@ test('doctor reports warnings honestly without writing', () => {
   assert.strictEqual(after, before, 'doctor must stay read-only');
 });
 
+test('Cursor Privacy Mode makes its built-in Memory inactive', {
+  skip: Number(process.versions.node.split('.')[0]) < 22,
+}, () => {
+  install();
+  const database = p('AppData', 'Roaming', 'Cursor', 'User', 'globalStorage', 'state.vscdb');
+  fs.mkdirSync(path.dirname(database), { recursive: true });
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(database);
+  db.exec('CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)');
+  const insert = db.prepare('INSERT INTO ItemTable (key, value) VALUES (?, ?)');
+  insert.run('cursor/memoriesEnabled', 'true');
+  insert.run('cursorai/donotchange/privacyMode', 'true');
+  db.close();
+
+  const output = doctor();
+  assert.ok(output.includes('PASS  Cursor Memory-kontrakt'), 'Privacy Mode did not neutralize Cursor Memory');
+});
+
 test('doctor accepts bridged skill links as real skills', () => {
   install();
   put(p('.claude', 'skills', 'demo', 'SKILL.md'), '# demo\n');

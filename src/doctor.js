@@ -314,7 +314,14 @@ function main() {
 
   const cursorMemory = cursorState('cursor/memoriesEnabled');
   if (cursorMemory.verified) {
-    add('Cursor Memory-kontrakt', String(cursorMemory.value).toLowerCase() !== 'true', `cursor/memoriesEnabled=${cursorMemory.value}`);
+    const cursorPrivacy = cursorState('cursorai/donotchange/privacyMode');
+    const memoryEnabled = String(cursorMemory.value).toLowerCase() === 'true';
+    const privacyEnabled = cursorPrivacy.verified && String(cursorPrivacy.value).toLowerCase() === 'true';
+    add(
+      'Cursor Memory-kontrakt',
+      !memoryEnabled || privacyEnabled,
+      `cursor/memoriesEnabled=${cursorMemory.value}, privacyMode=${cursorPrivacy.verified ? cursorPrivacy.value : 'NOT VERIFIED'}`
+    );
   } else {
     add('Cursor Memory-kontrakt', false, 'Cursor state database kunne ikke læses; NOT VERIFIED.', 'warn');
   }
