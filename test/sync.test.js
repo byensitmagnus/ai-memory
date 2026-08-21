@@ -189,6 +189,23 @@ test('Cursor Privacy Mode makes its built-in Memory inactive', {
   assert.ok(output.includes('PASS  Cursor Memory-kontrakt'), 'Privacy Mode did not neutralize Cursor Memory');
 });
 
+test('Cursor CLAUDE.md compatibility remains valid project context', {
+  skip: Number(process.versions.node.split('.')[0]) < 22,
+}, () => {
+  install();
+  const database = p('AppData', 'Roaming', 'Cursor', 'User', 'globalStorage', 'state.vscdb');
+  fs.mkdirSync(path.dirname(database), { recursive: true });
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(database);
+  db.exec('CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)');
+  db.prepare('INSERT INTO ItemTable (key, value) VALUES (?, ?)')
+    .run('cursor/claudeMdEnabled', 'true');
+  db.close();
+
+  const output = doctor();
+  assert.ok(!output.includes('Cursor CLAUDE.md-dublet'), 'valid project CLAUDE.md support was treated as duplicate global context');
+});
+
 test('doctor accepts bridged skill links as real skills', () => {
   install();
   put(p('.claude', 'skills', 'demo', 'SKILL.md'), '# demo\n');

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.2 — 2026-08-21
+
+- Removed the false Cursor `CLAUDE.md` duplication warning. Cursor uses
+  `CLAUDE.md` as valid project-scoped context; the shared home package remains
+  owned by the global `alwaysApply` MDC rule.
+- Added a regression for Cursor's `cursor/claudeMdEnabled=true` compatibility
+  state. The suite now contains 39 integration tests.
+
 ## 2.0.1 — 2026-08-21
 
 - Fixed the Cursor doctor gate to evaluate effective memory state: Privacy Mode

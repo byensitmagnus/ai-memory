@@ -325,10 +325,6 @@ function main() {
   } else {
     add('Cursor Memory-kontrakt', false, 'Cursor state database kunne ikke læses; NOT VERIFIED.', 'warn');
   }
-  const cursorClaude = cursorState('cursor/claudeMdEnabled');
-  if (cursorClaude.verified && String(cursorClaude.value).toLowerCase() === 'true') {
-    add('Cursor CLAUDE.md-dublet', false, 'cursor/claudeMdEnabled=true kan duplikere den globale MDC-regel.', 'warn');
-  }
   const brokenAdhd = brokenCursorAdhdHooks();
   if (brokenAdhd.length) {
     add('Cursor ADHD-plugin', false, `${brokenAdhd.length} cache-hook(s) bruger den manglende sh-shell; MDC-reglen er stadig aktiv.`, 'warn');

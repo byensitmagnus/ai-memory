@@ -88,8 +88,10 @@ Grok and ZCode are repaired by the installer. Cursor uses native
 `sessionStart` refresh/context injection plus `afterAgentResponse` write-back;
 its effective Memory state is checked read-only. Privacy Mode makes the legacy
 Memory toggle inactive, so `doctor.js` verifies both values instead of treating
-a stale toggle as runtime proof. Kimi CLI/Desktop use native lifecycle hooks;
-their shared records contain metadata only.
+a stale toggle as runtime proof. Cursor's `CLAUDE.md` compatibility remains
+enabled for project-scoped context; it does not replace or fork the global MDC
+package. Kimi CLI/Desktop use native lifecycle hooks; their shared records
+contain metadata only.
 
 ## 4. Project memory protocol
 
