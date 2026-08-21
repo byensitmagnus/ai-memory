@@ -16,10 +16,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { appDataRoot } = require('./platform-paths-(C)');
 
 const HOME = process.env.USERPROFILE || process.env.HOME || os.homedir();
 const MEM_HOME = path.join(HOME, '.ai-memory');
-const APPDATA = process.env.APPDATA || path.join(HOME, 'AppData', 'Roaming');
+const APPDATA = appDataRoot(HOME);
 const KIMI_DESKTOP_ROOT = path.join(APPDATA, 'kimi-desktop', 'daimon-share', 'daimon');
 const KIMI_DESKTOP_HOME = path.join(KIMI_DESKTOP_ROOT, 'runtime', 'kimi-code', 'home');
 const KIMI_WORKSPACE_START = '<!-- AI-MEMORY:KIMI-WORKSPACE:START -->';

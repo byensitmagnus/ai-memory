@@ -26,6 +26,7 @@ const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
+const { appDataRoot } = require('./platform-paths-(C)');
 
 const HOME = process.env.USERPROFILE || process.env.HOME || os.homedir();
 const MEM_HOME = path.join(HOME, '.ai-memory');
@@ -53,7 +54,7 @@ const CURSOR_SESSIONS = path.join(HOME, '.cursor', 'projects');
 
 // Kimi Desktop runs its embedded CLI with a private HOME. The public Kimi CLI
 // uses ~/.agents directly; these extra targets are conditional and harmless.
-const APPDATA = process.env.APPDATA || path.join(HOME, 'AppData', 'Roaming');
+const APPDATA = appDataRoot(HOME);
 const KIMI_DESKTOP_ROOT = path.join(APPDATA, 'kimi-desktop', 'daimon-share', 'daimon');
 const KIMI_PRIVATE_HOME = path.join(KIMI_DESKTOP_ROOT, 'runtime', 'kimi-code', 'home');
 const KIMI_PRIVATE_AGENTS = path.join(KIMI_PRIVATE_HOME, '.agents', 'AGENTS.md');
@@ -88,6 +89,18 @@ const IMPORT_MAX_AGE_DAYS = 14;
 const IMPORT_MAX_FILES = 25;
 const EXPORT_RECENT = 12;
 const SESSION_TEXT_LIMIT = 200;
+
+function oldestPendingBatch(items, lastImport, cutoff, limit = IMPORT_MAX_FILES) {
+  return items
+    .filter((item) => item.mtime > lastImport && item.mtime >= cutoff)
+    .sort((a, b) => a.mtime - b.mtime)
+    .slice(0, limit);
+}
+
+function completedBatchWatermark(lastImport, items, failed) {
+  if (failed) return lastImport;
+  return items.reduce((latest, item) => Math.max(latest, item.mtime), lastImport);
+}
 
 function log(msg) { process.stderr.write(`[ai-memory] ${msg}\n`); }
 function readSafe(p) { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } }
@@ -201,7 +214,7 @@ function ensureCodexHooks() {
   }
 
   const script = path.join(MEM_HOME, 'sync.js').replace(/\\/g, '/');
-  const syncCommand = `node "${script}"`;
+  const syncCommand = `"${process.execPath.replace(/\\/g, '/')}" "${script}"`;
   const contextCommand = `${syncCommand} --codex-context-hook`;
   const finishCommand = `${syncCommand} --codex-session-end`;
   const managed = {
@@ -546,13 +559,10 @@ function importCodexSessions() {
   const lastImport = Number(state.lastCodexImport || 0);
   const cutoff = Date.now() - IMPORT_MAX_AGE_DAYS * 86400000;
 
-  const rollouts = listCodexRollouts()
-    .filter(r => r.mtime > lastImport && r.mtime >= cutoff)
-    .slice(0, IMPORT_MAX_FILES);
+  const rollouts = oldestPendingBatch(listCodexRollouts(), lastImport, cutoff);
 
-  let imported = 0, maxMtime = lastImport;
+  let imported = 0, failed = false;
   for (const r of rollouts) {
-    maxMtime = Math.max(maxMtime, r.mtime);
     const s = summarizeCodexRollout(r.path);
     if (!s) continue;
     const when = new Date(r.mtime);
@@ -561,9 +571,13 @@ function importCodexSessions() {
     try {
       fs.writeFileSync(path.join(SESSION_STORE, fname), buildCodexSessionTmp(s, when));
       imported++;
-    } catch (e) { log(`WARN write ${fname}: ${e.message}`); }
+    } catch (e) {
+      log(`WARN write ${fname}: ${e.message}`);
+      failed = true;
+      break;
+    }
   }
-  state.lastCodexImport = maxMtime;
+  state.lastCodexImport = completedBatchWatermark(lastImport, rollouts, failed);
   saveState(state);
   if (imported) log(`importerede ${imported} Codex-session(s) til delt store`);
   else log('ingen nye Codex-sessions at importere');
@@ -665,13 +679,10 @@ function importGrokSessions() {
   const lastImport = Number(state.lastGrokImport || 0);
   const cutoff = Date.now() - IMPORT_MAX_AGE_DAYS * 86400000;
 
-  const summaries = listGrokSummaries()
-    .filter(r => r.mtime > lastImport && r.mtime >= cutoff)
-    .slice(0, IMPORT_MAX_FILES);
+  const summaries = oldestPendingBatch(listGrokSummaries(), lastImport, cutoff);
 
-  let imported = 0, maxMtime = lastImport;
+  let imported = 0, failed = false;
   for (const r of summaries) {
-    maxMtime = Math.max(maxMtime, r.mtime);
     const s = summarizeGrokSession(r.path);
     if (!s) continue;
     const when = new Date(s.ts || r.mtime);
@@ -680,9 +691,13 @@ function importGrokSessions() {
     try {
       fs.writeFileSync(path.join(SESSION_STORE, fname), buildGrokSessionTmp(s, when));
       imported++;
-    } catch (e) { log(`WARN write ${fname}: ${e.message}`); }
+    } catch (e) {
+      log(`WARN write ${fname}: ${e.message}`);
+      failed = true;
+      break;
+    }
   }
-  state.lastGrokImport = maxMtime;
+  state.lastGrokImport = completedBatchWatermark(lastImport, summaries, failed);
   saveState(state);
   if (imported) log(`importerede ${imported} Grok-session(s) til delt store`);
   else log('ingen nye Grok-sessions at importere');
@@ -814,14 +829,11 @@ function importKimiSessions() {
   const state = loadState();
   const lastImport = Number(state.lastKimiImport || 0);
   const cutoff = Date.now() - IMPORT_MAX_AGE_DAYS * 86400000;
-  const wires = listKimiWires()
-    .filter((item) => item.mtime > lastImport && item.mtime >= cutoff)
-    .slice(0, IMPORT_MAX_FILES);
+  const wires = oldestPendingBatch(listKimiWires(), lastImport, cutoff);
 
   let imported = 0;
-  let maxMtime = lastImport;
+  let failed = false;
   for (const item of wires) {
-    maxMtime = Math.max(maxMtime, item.mtime);
     const session = summarizeKimiWire(item);
     if (!session) continue;
     const when = new Date(session.timestamp || item.mtime);
@@ -830,9 +842,13 @@ function importKimiSessions() {
     try {
       fs.writeFileSync(path.join(SESSION_STORE, filename), buildKimiSessionTmp(session, when));
       imported++;
-    } catch (error) { log(`WARN write ${filename}: ${error.message}`); }
+    } catch (error) {
+      log(`WARN write ${filename}: ${error.message}`);
+      failed = true;
+      break;
+    }
   }
-  state.lastKimiImport = maxMtime;
+  state.lastKimiImport = completedBatchWatermark(lastImport, wires, failed);
   saveState(state);
   if (imported) log(`importerede ${imported} Kimi-session(s) til delt store`);
   else log('ingen nye Kimi-sessions at importere');
@@ -982,14 +998,11 @@ function importCursorSessions() {
   const state = loadState();
   const lastImport = Number(state.lastCursorImport || 0);
   const cutoff = Date.now() - IMPORT_MAX_AGE_DAYS * 86400000;
-  const transcripts = listCursorTranscripts()
-    .filter((item) => item.mtime > lastImport && item.mtime >= cutoff)
-    .slice(0, IMPORT_MAX_FILES);
+  const transcripts = oldestPendingBatch(listCursorTranscripts(), lastImport, cutoff);
 
   let imported = 0;
-  let maxMtime = lastImport;
+  let failed = false;
   for (const item of transcripts) {
-    maxMtime = Math.max(maxMtime, item.mtime);
     const session = summarizeCursorTranscript(item);
     if (!session) continue;
     const when = new Date(item.mtime);
@@ -998,9 +1011,13 @@ function importCursorSessions() {
     try {
       fs.writeFileSync(path.join(SESSION_STORE, filename), buildSimpleSessionTmp('Cursor', session, when));
       imported++;
-    } catch (error) { log(`WARN write ${filename}: ${error.message}`); }
+    } catch (error) {
+      log(`WARN write ${filename}: ${error.message}`);
+      failed = true;
+      break;
+    }
   }
-  state.lastCursorImport = maxMtime;
+  state.lastCursorImport = completedBatchWatermark(lastImport, transcripts, failed);
   saveState(state);
   if (imported) log(`importerede ${imported} Cursor-session(s) til delt store`);
   else log('ingen nye Cursor-sessions at importere');

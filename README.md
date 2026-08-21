@@ -1,3 +1,7 @@
+---
+source: ai
+---
+
 # ai-memory
 
 **A small, local control plane for Claude Code, Codex, Grok, Kimi, Cursor and ZCode.**
@@ -10,6 +14,24 @@ and has no network calls or telemetry.
 This repository is the **portable engine**. Your real business context,
 project notes, credentials and personal memory remain in a private vault —
 never in this public repository.
+
+## Exactly which AI repository to use
+
+| Repository | Use it when | Do not use it for | Canonical content |
+| --- | --- | --- | --- |
+| **`ai-memory` (this repository)** | The change is generic harness infrastructure that should work without Magnus or Byens IT context: installer, sync, hooks, doctor, privacy boundaries or cross-tool adapters. | Business facts, personal memory, company-selected skills, onboarding or SiteSmith product work. | Portable runtime code and neutral tests for Claude Code, Codex, Grok, Kimi, Cursor and ZCode. |
+| `magnusbrain` (private) | The information is specific to Magnus or Byens IT: goals, projects, decisions, memory, business context or custom operating rules. | Reusable neutral runtime code. | The private source of truth consumed by local AI tools. |
+| `byens-ai-setup` (private) | A Byens IT teammate must receive an approved bundle of company rules, skills, agents, MCP configuration or team memory. | Magnus' personal vault or invention of generic engine behavior. | Team distribution and onboarding; its engine snapshot is refreshed from `ai-memory`. |
+| [`sitesmith`](https://github.com/byensitmagnus/sitesmith) | The change develops or releases the SiteSmith website-building product itself. | General AI memory, company onboarding or private context. | SiteSmith skill source, browser verifier, benchmarks and releases. |
+
+Decision rule: generic multi-harness runtime changes start here. Private data
+goes to `magnusbrain`; team packaging goes to `byens-ai-setup`; SiteSmith product
+changes go to `sitesmith`. The archived `byens-brain` repository is history only
+and must never receive new work.
+
+Change direction: `ai-memory` → the engine snapshot in `magnusbrain` and
+`byens-ai-setup`. Never patch those snapshots first and leave the portable
+engine behind.
 
 ```text
 Private Obsidian vault                 Local AI installations

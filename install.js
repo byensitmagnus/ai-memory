@@ -15,6 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execFileSync, spawnSync } = require('child_process');
+const { appDataRoot, kimiDesktopRunnerCandidates } = require('./src/platform-paths-(C)');
 
 const REPO = __dirname;
 const HOME = process.env.USERPROFILE || process.env.HOME || os.homedir();
@@ -25,9 +26,9 @@ const GROK = path.join(HOME, '.grok');
 const CURSOR = path.join(HOME, '.cursor');
 const KIMI = path.join(HOME, '.kimi');
 const ZCODE = path.join(HOME, '.zcode');
-const APPDATA = process.env.APPDATA || path.join(HOME, 'AppData', 'Roaming');
+const APPDATA = appDataRoot(HOME);
 const KIMI_DESKTOP_HOME = path.join(APPDATA, 'kimi-desktop', 'daimon-share', 'daimon', 'runtime', 'kimi-code', 'home');
-const KIMI_DESKTOP_RUNNER = path.join(APPDATA, 'kimi-desktop', 'daimon-bundle', 'app', 'daimon', 'dist', 'src', 'runner', 'cli.js');
+const KIMI_DESKTOP_RUNNER = kimiDesktopRunnerCandidates(APPDATA, HOME).find((candidate) => fs.existsSync(candidate));
 
 const CHECK = process.argv.includes('--check');
 const UNINSTALL = process.argv.includes('--uninstall');
@@ -35,7 +36,7 @@ const DOCTOR = process.argv.includes('--doctor');
 
 /** Every hook we register runs this. It is also how --uninstall finds them again. */
 const MARKER = '.ai-memory/sync.js';
-const COMMAND = `node "${path.join(AIMEM, 'sync.js').replace(/\\/g, '/')}"`;
+const COMMAND = `"${process.execPath.replace(/\\/g, '/')}" "${path.join(AIMEM, 'sync.js').replace(/\\/g, '/')}"`;
 const CLAUDE_EVENTS = ['SessionStart', 'Stop', 'SessionEnd'];
 const GROK_EVENTS = ['SessionStart', 'Stop', 'SessionEnd'];
 
@@ -450,7 +451,7 @@ if (UNINSTALL) {
 }
 
 // 1) Engine ------------------------------------------------------------------
-for (const f of ['sync.js', 'sync-claude-to-codex.js', 'codex-notify.js', 'doctor.js', 'zcode-session-hook.js']) {
+for (const f of ['sync.js', 'sync-claude-to-codex.js', 'codex-notify.js', 'doctor.js', 'zcode-session-hook.js', 'platform-paths-(C).js']) {
   write(path.join(AIMEM, f), fs.readFileSync(path.join(REPO, 'src', f)));
 }
 for (const f of ['kimi.plugin.json', 'hook.cjs']) {

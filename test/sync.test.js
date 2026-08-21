@@ -71,6 +71,31 @@ after(() => { try { fs.rmSync(ROOT, { recursive: true, force: true }); } catch {
 
 const TARGETS = ['.claude/CLAUDE.md', '.codex/AGENTS.md', '.grok/rules/00-ai-memory.md'];
 
+test('platform data root uses macOS Application Support when APPDATA is absent', () => {
+  let appDataRoot, kimiDesktopRunnerCandidates;
+  try {
+    ({ appDataRoot, kimiDesktopRunnerCandidates } = require('../src/platform-paths-(C)'));
+  } catch {}
+  assert.ok(appDataRoot, 'the shared platform path resolver is missing');
+  assert.ok(kimiDesktopRunnerCandidates, 'the Kimi Desktop runner resolver is missing');
+  assert.strictEqual(
+    appDataRoot('/Users/tester', {}, 'darwin'),
+    '/Users/tester/Library/Application Support',
+  );
+  assert.strictEqual(
+    appDataRoot('C:\\Users\\tester', { APPDATA: 'D:\\ProfileData' }, 'win32'),
+    'D:\\ProfileData',
+  );
+  assert.deepStrictEqual(
+    kimiDesktopRunnerCandidates('/Users/tester/Library/Application Support', '/Users/tester', 'darwin'),
+    [
+      '/Users/tester/Library/Application Support/kimi-desktop/daimon-bundle/app/daimon/dist/src/runner/cli.js',
+      '/Applications/Kimi.app/Contents/Resources/resources/daimon-bundle/app/daimon/dist/src/runner/cli.js',
+      '/Users/tester/Applications/Kimi.app/Contents/Resources/resources/daimon-bundle/app/daimon/dist/src/runner/cli.js',
+    ],
+  );
+});
+
 // --- the core promise -------------------------------------------------------
 
 test('renders the same bytes to all three harnesses', () => {
@@ -304,6 +329,35 @@ test('imports are watermarked so the same session is not read twice', () => {
   assert.ok(first.mark > 0, 'no watermark was recorded at all');
 });
 
+test('an import batch drains oldest first without skipping sessions above the limit', () => {
+  install();
+  const base = Date.now() - 60_000;
+  for (let index = 1; index <= 30; index++) {
+    const file = p('.codex', 'sessions', `rollout-batch-${index}.jsonl`);
+    put(file, [
+      JSON.stringify({ type: 'session_meta', payload: {
+        cwd: '/work/batch',
+        id: `batch-${index}`,
+        timestamp: new Date(base + index * 1_000).toISOString(),
+      } }),
+      JSON.stringify({ type: 'response_item', payload: {
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: `batch prompt ${index}` }],
+      } }),
+    ].join('\n') + '\n');
+    const mtime = new Date(base + index * 1_000);
+    fs.utimesSync(file, mtime, mtime);
+  }
+
+  sync();
+  sync();
+
+  const imported = fs.readdirSync(p('.claude', 'session-data'))
+    .filter((name) => name.includes('-codex-'));
+  assert.strictEqual(imported.length, 30, 'the newest batch watermark skipped five older sessions');
+});
+
 test('session import watermarks are machine-local, not part of shared memory', () => {
   install();
   put(p('.codex', 'sessions', 'rollout-state.jsonl'), rollout('/work/shop', 'keep state local'));
@@ -482,11 +536,13 @@ test('Codex install owns the full shared-memory lifecycle without duplicates', (
   }));
   install();
   const hooks = JSON.parse(read(p('.codex', 'hooks.json'))).hooks;
+  const expectedRuntime = `"${process.execPath.replace(/\\/g, '/')}"`;
   for (const event of ['SessionStart', 'UserPromptSubmit', 'SubagentStart', 'Stop', 'SessionEnd']) {
     assert.ok(hooks[event], `${event} was not registered for Codex`);
     const ours = hooks[event].flatMap((group) => group.hooks || [])
       .filter((hook) => String(hook.command).includes('.ai-memory/sync.js'));
     assert.strictEqual(ours.length, 1, `${event} has ${ours.length} managed hooks`);
+    assert.ok(ours[0].command.startsWith(expectedRuntime), `${event} does not use the active Node runtime`);
   }
   assert.ok(JSON.stringify(hooks).includes('echo keep-me'), 'an unrelated Codex hook was removed');
 
