@@ -1,9 +1,9 @@
 # ai-memory
 
-**A small, local control plane for Claude Code, Codex and Grok.**
+**A small, local control plane for Claude Code, Codex, Grok, Kimi, Cursor and ZCode.**
 
 Write your working rules once. `ai-memory` renders the same package into all
-three harnesses, carries short session recall across them, and keeps reusable
+six local harnesses, carries bounded session metadata across them, and keeps reusable
 skills, agents and project instructions aligned. It is dependency-free Node.js
 and has no network calls or telemetry.
 
@@ -17,7 +17,9 @@ Private Obsidian vault                 Local AI installations
 00-AI/ai-memory/ ────────────────►    ~/.claude/CLAUDE.md
   INSTRUCTIONS.md                      ~/.codex/AGENTS.md
   CONTEXT.md                           ~/.grok/rules/00-ai-memory.md
-  MEMORY.md
+  MEMORY.md                            ~/.agents/AGENTS.md (Kimi)
+                                       ~/.cursor/rules/00-ai-memory.mdc
+                                       ~/.zcode/AGENTS.md
         │
         └── Syncthing (LAN) ─────► second machine
 ```
@@ -26,8 +28,8 @@ Private Obsidian vault                 Local AI installations
 
 | Problem | What ai-memory does |
 | --- | --- |
-| Claude, Codex and Grok give different answers | Renders one **byte-identical** home package into all three tools. |
-| A switch of AI loses useful context | Imports recent Codex and Grok session summaries into the shared package. |
+| Local AI tools give different answers | Renders one **byte-identical** home package into Claude Code, Codex, Grok, Kimi, Cursor and installed ZCode. |
+| A switch of AI loses useful context | Stores bounded session records privately and injects metadata only — never raw prompts — into generated instructions. |
 | A skill exists only in one tool | Bridges skills, agents, commands and project instructions from the Claude-compatible source. |
 | A setup silently drifts | `doctor.js` reports the exact broken target without changing files. |
 | A second machine becomes a parallel brain | Keep canonical content in a private Obsidian vault and sync that vault, not entire home folders. |
@@ -42,6 +44,10 @@ node ai-memory/install.js --check
 node ai-memory/install.js
 node ai-memory/install.js --doctor
 ```
+
+`--check` is a no-write preview of installer-owned engine/config files.
+`--doctor` is the separate read-only gate for generated packages, hooks,
+native-memory flags and Obsidian ownership.
 
 Edit only these sources in `~/.ai-memory/`:
 
@@ -61,7 +67,8 @@ node ~/.ai-memory/doctor.js
 # or: node ai-memory/install.js --doctor
 ```
 
-Expected finish: `100% ALIGNED`.
+Expected finish: `100% ALIGNED`, or `ALIGNED WITH WARNINGS` when optional
+runtime evidence is unavailable. Warnings are never labelled as 100% proof.
 
 ## The complete operating model
 
@@ -71,7 +78,7 @@ Expected finish: `100% ALIGNED`.
    tests and documentation. Safe to share and audit.
 2. **Private Brain — your Obsidian vault.** Goals, project state, decisions,
    custom skills and real memory. This is your canonical data.
-3. **Local adapters — Claude, Codex and Grok.** Generated files and local
+3. **Local adapters — Claude Code, Codex, Grok, Kimi, Cursor and ZCode.** Generated files and local
    discovery links. Rebuildable on every machine; never the source of truth.
 4. **LAN sync — Syncthing.** Synchronises the private vault between machines.
    Git is optional revision history, not live file replication.
@@ -87,14 +94,23 @@ Every run writes the same bytes to:
 ~/.claude/CLAUDE.md
 ~/.codex/AGENTS.md
 ~/.grok/rules/00-ai-memory.md
+~/.agents/AGENTS.md
+~/.cursorrules
+~/.zcode/AGENTS.md                 # when ZCode is installed
 ```
+
+Cursor also receives an `alwaysApply: true` MDC rule plus native `sessionStart`
+refresh/context injection and `afterAgentResponse` write-back hooks. Kimi
+Desktop receives the same package in its private runtime home and workspace
+plus a native `SessionStart`/`SessionEnd` plugin. In the workspace, ai-memory
+owns only a marked block inside `AGENTS.md`; existing project rules are kept.
 
 The generated package contains, in this order:
 
 1. `INSTRUCTIONS.md`
 2. `CONTEXT.md` when present
 3. `MEMORY.md`
-4. the most recent cross-harness session summaries
+4. the most recent cross-harness session metadata
 5. an on-demand map of Claude project memory
 
 It is fenced with `AI-MEMORY` markers. Never edit the generated files directly:
@@ -110,7 +126,7 @@ breaking:
 - Keep third-party skills at their original licensed source. Do not copy a
   whole local skill library into this project.
 - Sync only canonical content between computers. Do not sync `~/.claude`,
-  `~/.codex` or `~/.grok` wholesale: caches, sessions, plugins and credentials
+  `~/.codex`, `~/.grok`, `~/.cursor`, `~/.kimi` or `~/.zcode` wholesale: caches, sessions, plugins and credentials
   are machine-specific.
 - Import watermarks live in `~/.ai-memory-runtime/`, deliberately outside the
   shared source folder, so one computer cannot suppress another computer's
@@ -134,6 +150,13 @@ to own it all:
 
 [Integration boundaries](docs/INTEGRATIONS.md) explains what belongs in each
 place and what must stay private.
+
+## ChatGPT boundary
+
+ChatGPT web/mobile cannot read local Obsidian files or run these hooks. Codex
+inside ChatGPT can use the local package when it runs on the configured machine;
+plain ChatGPT needs separately maintained Project/Custom Instructions. The
+local doctor therefore never claims generic ChatGPT runtime alignment.
 
 ## Verification and development
 

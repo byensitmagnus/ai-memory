@@ -1,7 +1,7 @@
 {
   "name": "ai-memory",
-  "version": "1.1.0",
-  "description": "One identical instruction file for Claude Code, Codex and Grok - plus session memory that crosses between them.",
+  "version": "2.0.0",
+  "description": "One local Obsidian-backed instruction and memory package for Claude Code, Codex, Grok, Kimi, Cursor and ZCode.",
   "license": "MIT",
   "repository": "github:byensitmagnus/ai-memory",
   "engines": { "node": ">=18" },

@@ -1,16 +1,18 @@
 # How it works
 
-Four small scripts, no dependencies. This document is so you can audit it before you let it run
+Small dependency-free scripts and native adapters. This document is so you can audit them before you let them run
 on every session start.
 
-## The four scripts
+## The core scripts
 
-| File | Lines | Job |
-|---|---|---|
-| `sync.js` | 468 | Build the package, write it to three targets, import sessions |
-| `sync-claude-to-codex.js` | 459 | Mirror skills/agents/commands between harnesses |
-| `codex-notify.js` | 21 | Optional Codex `notify` shim so sync also runs on turn-end |
-| `doctor.js` | small | Read-only check of sources, generated targets and bridged skills |
+| File | Job |
+|---|---|
+| `sync.js` | Build the package, reconcile Codex hooks and import bounded session records |
+| `sync-claude-to-codex.js` | Mirror skills/agents/commands between local harnesses |
+| `doctor.js` | Read-only check of sources, targets, hooks, native-memory flags and Obsidian ownership |
+| `zcode-session-hook.js` | Save ZCode session metadata and refresh the package |
+| `kimi-desktop-plugin/*` | Native Kimi Desktop `SessionStart`/`SessionEnd` adapter |
+| `codex-notify.js` | Legacy optional Codex `notify` shim |
 
 `sync.js` requires `sync-claude-to-codex.js` and calls it first, so the skill inventory is fresh
 before the package is rendered.
@@ -18,11 +20,12 @@ before the package is rendered.
 ## Order of operations on every run
 
 1. Bridge skills, agents, commands and per-project `AGENTS.md`.
-2. Import new Codex sessions (`rollout-*.jsonl`), watermarked so old ones are never re-read.
-3. Import new Grok sessions (`summary.json` + `prompt_history.jsonl`).
-4. Render the package and write it to all three targets — but only where the bytes differ.
+2. Import new Codex, Grok, Kimi and Cursor session records, watermarked so old ones are never re-read.
+3. Render the package and write byte-identical instructions to every installed target.
+4. Write Cursor's `alwaysApply` wrapper and bridge Kimi Desktop skills.
 
-Step 4 matters: if nothing changed, nothing is written, so file watchers and backup tools stay quiet.
+All generated writes are content-aware: if nothing changed, nothing is written,
+so file watchers and backup tools stay quiet.
 
 ## Managed blocks
 
@@ -41,7 +44,8 @@ block, the content belongs in the source file.
 
 | Constant | Value | Why |
 |---|---|---|
-| `MAP_PER_PROJECT_CAP` | 3.500 chars | A project index can grow without bound; the package can't. |
+| `MAP_HINT_BULLETS` | 4 | A project index can grow without bound; only four hints are injected. |
+| `MAP_HINT_CHARS` | 110 | Each injected project-memory hint stays compact. |
 | `IMPORT_MAX_AGE_DAYS` | 14 | Sessions older than two weeks are noise, not context. |
 | `IMPORT_MAX_FILES` | 25 | Caps the cost of the first run against a long history. |
 | `EXPORT_RECENT` | 12 | How many session lines end up in the package. |
@@ -50,8 +54,9 @@ Change them at the top of `sync.js`. There is no config file — one less thing 
 
 ## Session import, in detail
 
-Codex rollouts are JSONL where each line is an event. The importer keeps `session_meta` (cwd, id,
-timestamp) and `response_item` entries, and from those only:
+Codex rollouts are JSONL where each line is an event. Their private imported
+record may retain a bounded, wrapper-stripped user summary and tool names so a
+later local agent can inspect the work without copying the raw rollout. It keeps:
 
 - user messages, minus the wrapper blocks (`<permissions>`, `<user_instructions>`,
   `<environment_context>`, `<recommended_plugins>`, injected AGENTS.md) that would otherwise be 90 %
@@ -61,21 +66,28 @@ timestamp) and `response_item` entries, and from those only:
 Grok stores a `summary.json` per session but keeps prompts in a workspace-level
 `prompt_history.jsonl`, so the importer joins them on `session_id` and skips `is_bash` entries.
 
-Both are written as `~/.claude/session-data/<date>-<source>-<id>-session.tmp` in the same format,
-which is what makes a single renderer work for all three harnesses. Their
-import watermarks live in the machine-local `~/.ai-memory-runtime/` directory,
+Kimi and ZCode records are stricter: they contain only source, project, session
+ID, pointer and turn/runtime metadata — never prompt or assistant text.
+
+Records are written as `~/.claude/session-data/<date>-<source>-<id>-session.tmp` in the same format.
+The generated `SESSIONS` block exposes only project/date/source metadata for
+every harness; raw prompt text is never injected into home instructions. Import
+watermarks live in the machine-local `~/.ai-memory-runtime/` directory,
 so a Syncthing-backed source folder cannot make another machine skip sessions.
 
 ## Failure behaviour
 
-Every stage is wrapped. A broken Codex install, an unreadable session file or a missing `~/.grok`
-logs a warning to stderr and the run continues. The package is still written.
-
-The one thing that will stop it: `~/.ai-memory/` not existing. The installer creates it.
+Every stage is wrapped. A broken harness install, an unreadable session file or
+a missing local config logs a warning to stderr and the run continues. The
+installer creates `~/.ai-memory/`; missing canonical source files are reported
+in the generated package and by `doctor.js`.
 
 ## What it never does
 
 - No network calls.
-- No writes outside `~/.ai-memory`, `~/.claude`, `~/.codex`, `~/.agents` and `~/.grok`.
-- No deletion of your content. The bridge mirrors skills and will remove a skill file that no longer
-  exists on the source side — that is the only delete in the codebase.
+- Writes are limited to the documented harness homes, `~/.ai-memory-runtime`,
+  registered project roots that receive generated `AGENTS.md`, and Kimi's
+  configured workspace managed block.
+- No deletion of your content. The bridge deliberately does not auto-prune a
+  generated adapter when its source disappears; stale adapters require explicit
+  cleanup instead of a risky implicit delete.

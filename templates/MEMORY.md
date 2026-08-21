@@ -1,6 +1,6 @@
 # Durable facts
 
-Rendered verbatim into all three harnesses on every session. **Only write things that will still be
+Rendered verbatim into every supported local harness on every session. **Only write things that will still be
 true in a month** — anything shorter-lived belongs in the session, not here.
 
 ## Projects

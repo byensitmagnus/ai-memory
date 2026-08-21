@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * Synkroniserer genbrugelige udvidelser på tværs af Claude Code + Codex + Grok.
+ * Synkroniserer genbrugelige udvidelser på tværs af de lokale AI-værktøjer.
  *
  * Skills:
  *   Claude-skills + Firecrawl-plugin-skills → ~/.agents/skills (junctions)
@@ -16,8 +16,8 @@
  *   Claude slash-commands → Codex/Grok-skills under ~/.agents/skills
  *
  * Projekt-instruktioner:
- *   CLAUDE.md spejles 1:1 til AGENTS.md (samme body), så alle tre værktøjer
- *   ser samme projektregler (Grok loader begge filnavne).
+ *   CLAUDE.md spejles 1:1 til AGENTS.md (samme body), så alle understøttede
+ *   værktøjer ser samme projektregler (Grok loader begge filnavne).
  *
  * Flytter aldrig credentials. Overskriver ikke brugeroprettede skill-mapper.
  */
@@ -34,10 +34,16 @@ const USER_SKILLS = path.join(HOME, '.agents', 'skills');
 const CLAUDE_SKILLS = path.join(CLAUDE_HOME, 'skills');
 const CODEX_AGENTS = path.join(CODEX_HOME, 'agents');
 const GROK_AGENTS = path.join(GROK_HOME, 'agents');
+const ZCODE_HOME = path.join(HOME, '.zcode');
+const ZCODE_SKILLS = path.join(ZCODE_HOME, 'skills');
+const ZCODE_COMMANDS = path.join(ZCODE_HOME, 'commands');
+const ZCODE_AGENTS = path.join(ZCODE_HOME, 'agents');
 const GENERATED_MARKER = '<!-- genereret af ~/.ai-memory/sync-claude-to-codex.js -->';
 const PROJECT_START = '<!-- AI-BRIDGE:CLAUDE-PROJECT:START -->';
 const PROJECT_END = '<!-- AI-BRIDGE:CLAUDE-PROJECT:END -->';
 const GROK_AGENT_MARKER = '<!-- genereret af ~/.ai-memory/sync-claude-to-codex.js (grok-agent) -->';
+const ZCODE_AGENT_MARKER = '<!-- genereret af ~/.ai-memory/sync-claude-to-codex.js (zcode-agent) -->';
+const ZCODE_COMMAND_MARKER = '<!-- genereret af ~/.ai-memory/sync-claude-to-codex.js (zcode-command) -->';
 
 function log(message) {
   process.stderr.write(`[ai-bridge] ${message}\n`);
@@ -54,7 +60,7 @@ function readSafe(file) {
 function listDirs(dir) {
   try {
     return fs.readdirSync(dir, { withFileTypes: true })
-      .filter(entry => entry.isDirectory())
+      .filter(entry => entry.isDirectory() || entry.isSymbolicLink())
       .map(entry => path.join(dir, entry.name));
   } catch {
     return [];
@@ -317,6 +323,101 @@ function syncCommands(counters) {
   }
 }
 
+function syncZcodeSkills(counters) {
+  if (!fs.existsSync(ZCODE_HOME)) return;
+  ensureDir(ZCODE_SKILLS);
+  const bridge = { linksCreated: 0, linksCurrent: 0, linksSkipped: 0 };
+  for (const source of listDirs(USER_SKILLS)) {
+    let real = source;
+    try { real = fs.realpathSync(source); } catch { /* regular directory */ }
+    ensureSkillLink(real, ZCODE_SKILLS, bridge);
+  }
+  counters.zcodeSkillsCreated = bridge.linksCreated;
+  counters.zcodeSkillsCurrent = bridge.linksCurrent;
+  counters.zcodeSkillsSkipped = bridge.linksSkipped;
+}
+
+function syncZcodeAgents(counters) {
+  if (!fs.existsSync(ZCODE_HOME)) return;
+  ensureDir(ZCODE_AGENTS);
+  let files = [];
+  try {
+    files = fs.readdirSync(path.join(CLAUDE_HOME, 'agents')).filter((name) => name.toLowerCase().endsWith('.md'));
+  } catch { return; }
+
+  for (const filename of files) {
+    const parsed = parseFrontmatter(readSafe(path.join(CLAUDE_HOME, 'agents', filename)));
+    const name = parsed.fields.name || path.basename(filename, '.md');
+    const destination = path.join(ZCODE_AGENTS, `${name}.md`);
+    const existing = readSafe(destination);
+    if (existing && !existing.includes(ZCODE_AGENT_MARKER) && !existing.includes(GENERATED_MARKER)) {
+      counters.zcodeAgentsSkipped++;
+      continue;
+    }
+    const output = [
+      '---',
+      `name: ${name}`,
+      `description: ${parsed.fields.description || `Importeret Claude-agent: ${name}`}`,
+      ...(parsed.fields.tools ? [`tools: ${parsed.fields.tools}`] : []),
+      ...(parsed.fields.maxTurns ? [`maxTurns: ${parsed.fields.maxTurns}`] : []),
+      '---',
+      '',
+      ZCODE_AGENT_MARKER,
+      'Denne agent er importeret fra Claude Code. Brug de tilsvarende native værktøjer i ZCode.',
+      '',
+      parsed.body,
+    ].join('\n');
+    if (writeIfChanged(destination, output)) counters.zcodeAgentsUpdated++;
+    else counters.zcodeAgentsCurrent++;
+  }
+}
+
+const ZCODE_COMMAND_NAME_MAP = {
+  goal: 'project-goal',
+  ultraplan: 'ultraplan',
+  ultrareview: 'ultrareview',
+};
+
+function syncZcodeCommands(counters) {
+  if (!fs.existsSync(ZCODE_HOME)) return;
+  ensureDir(ZCODE_COMMANDS);
+  let files = [];
+  try {
+    files = fs.readdirSync(path.join(CLAUDE_HOME, 'commands')).filter((name) => name.toLowerCase().endsWith('.md'));
+  } catch { return; }
+
+  for (const filename of files) {
+    const sourceName = path.basename(filename, '.md');
+    const name = ZCODE_COMMAND_NAME_MAP[sourceName];
+    if (!name) continue;
+    const parsed = parseFrontmatter(readSafe(path.join(CLAUDE_HOME, 'commands', filename)));
+    const destination = path.join(ZCODE_COMMANDS, `${name}.md`);
+    const existing = readSafe(destination);
+    if (existing && !existing.includes(ZCODE_COMMAND_MARKER) && !existing.includes(GENERATED_MARKER)) {
+      counters.zcodeCommandsSkipped++;
+      continue;
+    }
+    const body = parsed.body
+      .replace(/\bCLAUDE\.md\b/g, 'AGENTS.md')
+      .replace(/~\/\.claude\/skills\//g, '~/.zcode/skills/')
+      .replace(/\bWorkflow tool\b/gi, 'Agent tool')
+      .replace(/\bWorkflow\b/g, 'Agent tool');
+    const output = [
+      '---',
+      `description: ${parsed.fields.description || `Importeret Claude-kommando: ${sourceName}`}`,
+      ...(parsed.fields['argument-hint'] ? [`argument-hint: ${parsed.fields['argument-hint']}`] : []),
+      '---',
+      '',
+      ZCODE_COMMAND_MARKER,
+      'ZCode-tilpasning: brug ZCodes native værktøjer, hvor arbejdsgangen nævner Claude-navne.',
+      '',
+      body,
+    ].join('\n');
+    if (writeIfChanged(destination, output)) counters.zcodeCommandsUpdated++;
+    else counters.zcodeCommandsCurrent++;
+  }
+}
+
 function normalizePath(value) {
   return path.resolve(String(value).replace(/\//g, path.sep));
 }
@@ -368,7 +469,7 @@ function projectBodyIdentical(source) {
   // 100% ens indhold: kun neutrale stier/navne, ingen tool-specifik omskrivning.
   return source
     .replace(/^#\s+CLAUDE\.md\s*[—-]?\s*/i, '# Projekt-instruktioner\n\n')
-    .replace(/Auto-loaded ved hver Claude Code session/gi, 'Auto-loaded ved hver session (Claude/Codex/Grok)')
+    .replace(/Auto-loaded ved hver Claude Code session/gi, 'Auto-loaded ved hver session (fælles AI-værktøjer)')
     .replace(/~\/\.claude\/CLAUDE\.md/g, '~/.ai-memory (fælles home-pakke)')
     .replace(/~\/\.codex\/AGENTS\.md/g, '~/.ai-memory (fælles home-pakke)')
     .trim();
@@ -431,6 +532,15 @@ function main() {
     commandsUpdated: 0,
     commandsCurrent: 0,
     commandsSkipped: 0,
+    zcodeSkillsCreated: 0,
+    zcodeSkillsCurrent: 0,
+    zcodeSkillsSkipped: 0,
+    zcodeAgentsUpdated: 0,
+    zcodeAgentsCurrent: 0,
+    zcodeAgentsSkipped: 0,
+    zcodeCommandsUpdated: 0,
+    zcodeCommandsCurrent: 0,
+    zcodeCommandsSkipped: 0,
     projectsCreated: 0,
     projectsUpdated: 0,
     projectsReplaced: 0,
@@ -441,6 +551,9 @@ function main() {
   try { syncSkillLinks(counters); } catch (error) { log(`skill-fejl: ${error.message}`); }
   try { syncAgents(counters); } catch (error) { log(`agent-fejl: ${error.message}`); }
   try { syncCommands(counters); } catch (error) { log(`kommando-fejl: ${error.message}`); }
+  try { syncZcodeSkills(counters); } catch (error) { log(`zcode-skills-fejl: ${error.message}`); }
+  try { syncZcodeAgents(counters); } catch (error) { log(`zcode-agents-fejl: ${error.message}`); }
+  try { syncZcodeCommands(counters); } catch (error) { log(`zcode-kommando-fejl: ${error.message}`); }
   try { syncProjectInstructions(counters); } catch (error) { log(`projekt-fejl: ${error.message}`); }
 
   log(
@@ -448,6 +561,9 @@ function main() {
     `agents codex: ${counters.agentsUpdated} opdateret, ${counters.agentsCurrent} ajour; ` +
     `agents grok: ${counters.grokAgentsUpdated} opdateret, ${counters.grokAgentsCurrent} ajour, ${counters.grokAgentsSkipped} bevaret; ` +
     `kommandoer: ${counters.commandsUpdated} opdateret, ${counters.commandsCurrent} ajour, ${counters.commandsSkipped} bevaret; ` +
+    `zcode skills: ${counters.zcodeSkillsCreated} nye, ${counters.zcodeSkillsCurrent} ajour, ${counters.zcodeSkillsSkipped} bevaret; ` +
+    `zcode agents: ${counters.zcodeAgentsUpdated} opdateret, ${counters.zcodeAgentsCurrent} ajour, ${counters.zcodeAgentsSkipped} bevaret; ` +
+    `zcode commands: ${counters.zcodeCommandsUpdated} opdateret, ${counters.zcodeCommandsCurrent} ajour, ${counters.zcodeCommandsSkipped} bevaret; ` +
     `projekter: ${counters.projectsCreated} oprettet, ${counters.projectsUpdated} opdateret, ` +
     `${counters.projectsReplaced} erstattet, ${counters.projectsMerged} flettet, ${counters.projectsCurrent} ajour`
   );

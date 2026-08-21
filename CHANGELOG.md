@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.0.0 — 2026-08-21
+
+- Expanded the byte-identical package to Kimi, Cursor and ZCode alongside
+  Claude Code, Codex and Grok.
+- Added native lifecycle hooks for Codex, Cursor, Kimi CLI/Desktop and ZCode,
+  with metadata-only Kimi/ZCode recall and no prompt injection into generated
+  instructions.
+- Kimi Desktop workspace instructions now use one managed block and preserve
+  existing project-specific `AGENTS.md` rules.
+- Disabled competing Grok and ZCode native-memory switches during install while
+  preserving their existing data. Cursor's SQLite setting remains a read-only
+  doctor gate because it must be changed through Cursor's UI.
+- Isolated Grok's native lifecycle adapter from imported Claude/Cursor hooks, so
+  each event runs shared-memory sync exactly once.
+- Expanded `doctor.js` to verify hook events, native-memory contracts, Cursor
+  `alwaysApply`, Kimi Desktop plugin bytes, ZCode selftest and whether
+  `~/.ai-memory` physically belongs to a registered Obsidian vault.
+- Added fail-closed TOML repair, idempotent hook merging, owned Kimi Desktop
+  plugin cleanup on uninstall and 37 integration tests.
+
 ## 1.1.0 — 2026-07-29
 
 - Added a read-only `doctor.js` with byte-hash, managed-block and skill-bridge

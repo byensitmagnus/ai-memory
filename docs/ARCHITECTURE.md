@@ -18,7 +18,9 @@ private, canonical   ┌──────────────────�
                       │  projects/ · decisions/       │  ├───────────────────┤
                       │  custom skills/               │──│ Codex             │
                       └──────────────┬───────────────┘  ├───────────────────┤
-                                     │                  │ Grok              │
+                                     │                  │ Grok · Kimi       │
+                                     │                  ├───────────────────┤
+                                     │                  │ Cursor · ZCode    │
                        Syncthing LAN │                  └───────────────────┘
                                      ▼
                       ┌──────────────────────────────┐
@@ -33,7 +35,7 @@ This repository contains only generic, inspectable code:
 
 - the installer and hooks;
 - the byte-identical package renderer;
-- the Claude → Codex/Grok bridge;
+- the cross-harness skill/agent/command bridge;
 - read-only diagnostics, tests and neutral templates.
 
 It must never contain actual memory, customer information, credentials,
@@ -65,7 +67,7 @@ computer; they are runtime state, not shared memory.
 
 ## 3. Generated adapters
 
-`sync.js` is the only writer of the three home instruction files. It combines:
+`sync.js` is the only writer of the generated home instruction files. It combines:
 
 - behaviour (`INSTRUCTIONS.md`),
 - local/business context (`CONTEXT.md`),
@@ -80,6 +82,13 @@ real drift check, not a visual guess.
 `sync-claude-to-codex.js` bridges discovered skills, agents, slash commands and
 project-level instructions. The original source is preserved; generated
 adapters carry explicit markers so they can be regenerated safely.
+
+Competing native-memory switches are kept off where they would fork the Brain.
+Grok and ZCode are repaired by the installer. Cursor uses native
+`sessionStart` refresh/context injection plus `afterAgentResponse` write-back;
+its private SQLite setting is checked read-only and must be changed in Cursor's
+UI. Kimi CLI/Desktop use native lifecycle hooks; their shared records contain
+metadata only.
 
 ## 4. Project memory protocol
 

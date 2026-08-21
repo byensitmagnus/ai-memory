@@ -2,7 +2,7 @@
 'use strict';
 /**
  * Codex `notify`-program. Codex kalder den med ét JSON-argument pr. event.
- * Vi kører den fælles sync ved hver fuldført tur, så Claude/Codex/Grok targets
+ * Vi kører den fælles sync ved hver fuldført tur, så alle genererede targets
  * + den delte session-store holdes friske fra Codex-siden. Fejler aldrig hårdt.
  */
 const path = require('path');

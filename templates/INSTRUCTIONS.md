@@ -1,6 +1,6 @@
 # Behavioral instructions
 
-Replace this with your own. It is rendered verbatim into all three harnesses, so keep it short —
+Replace this with your own. It is rendered verbatim into every supported local harness, so keep it short —
 every line costs context on every single session.
 
 ## 1. Think before coding

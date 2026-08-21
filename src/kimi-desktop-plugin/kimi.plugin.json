@@ -1,0 +1,22 @@
+{
+  "$schema": "https://kimi.com/schemas/kimi.plugin.schema.json",
+  "name": "ai-memory",
+  "version": "2.0.0",
+  "description": "Keeps local Kimi sessions aligned with the shared ai-memory package without copying conversation text.",
+  "author": "Byens IT",
+  "license": "MIT",
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "matcher": "startup|resume",
+      "command": "node hook.cjs",
+      "timeout": 30
+    },
+    {
+      "event": "SessionEnd",
+      "matcher": "exit",
+      "command": "node hook.cjs",
+      "timeout": 4
+    }
+  ]
+}

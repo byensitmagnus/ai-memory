@@ -1,6 +1,6 @@
 # Context
 
-Who you are and what you're working on. Rendered verbatim into all three harnesses.
+Who you are and what you're working on. Rendered verbatim into every supported local harness.
 
 This file is optional — delete it and the block disappears from the generated package instead of
 leaving a "missing" placeholder.

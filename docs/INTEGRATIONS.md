@@ -17,7 +17,14 @@ an unmaintainable dump of copied files.
 Install third-party skills from their original project, respecting that
 project's licence. Keep private or business-specific skills in your private
 Brain. `sync-claude-to-codex.js` makes the discovered inventory available to
-Codex and Grok; it does not grant a licence to redistribute it.
+the supported local harnesses; it does not grant a licence to redistribute it.
+
+## ChatGPT
+
+ChatGPT web/mobile has no local filesystem or hook access. It cannot read this
+Obsidian-backed package unless a separate connector, Project instruction or
+Custom GPT is configured. Codex running locally can use the package; generic
+ChatGPT is intentionally outside `doctor.js`'s proof boundary.
 
 ## Why the boundary matters
 

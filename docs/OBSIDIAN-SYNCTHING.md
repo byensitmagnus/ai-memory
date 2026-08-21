@@ -64,7 +64,7 @@ the ignore rule on each endpoint.
    `Need files = 0`, `Pull errors = 0` and remote completion is 100%.
 4. In Obsidian, select the canonical vault and remove old vault registrations
    from the UI only.
-5. Run `node ~/.ai-memory/doctor.js` on both machines. The three generated
+5. Run `node ~/.ai-memory/doctor.js` on both machines. The generated
    package hashes must match per machine.
 
 ## If a conflict appears
