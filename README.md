@@ -104,6 +104,8 @@ refresh/context injection and `afterAgentResponse` write-back hooks. Kimi
 Desktop receives the same package in its private runtime home and workspace
 plus a native `SessionStart`/`SessionEnd` plugin. In the workspace, ai-memory
 owns only a marked block inside `AGENTS.md`; existing project rules are kept.
+The installer also disables Codex, Grok and ZCode native memory so durable facts
+cannot fork away from the canonical vault; `doctor.js` verifies that contract.
 
 The generated package contains, in this order:
 

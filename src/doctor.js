@@ -128,6 +128,11 @@ function cursorState(key) {
   } catch { return { verified: false, value: null }; }
 }
 
+function cursorNoStorage(value) {
+  try { return JSON.parse(String(value || ''))?.privacyMode === 'PRIVACY_MODE_NO_STORAGE'; }
+  catch { return false; }
+}
+
 function brokenCursorAdhdHooks() {
   const root = path.join(HOME, '.cursor', 'plugins', 'cache', 'i-have-adhd', 'i-have-adhd');
   let versions;
@@ -238,9 +243,19 @@ function main() {
   );
   const codexConfigFile = path.join(HOME, '.codex', 'config.toml');
   if (fs.existsSync(codexConfigFile)) {
-    add('Codex hook-feature', tomlBoolean(read(codexConfigFile), 'features', 'hooks') === true, '[features].hooks=true');
+    const codexConfig = read(codexConfigFile);
+    add('Codex hook-feature', tomlBoolean(codexConfig, 'features', 'hooks') === true, '[features].hooks=true');
+    const nativeMemories = tomlBoolean(codexConfig, 'features', 'memories');
+    const generateMemories = tomlBoolean(codexConfig, 'memories', 'generate_memories');
+    const useMemories = tomlBoolean(codexConfig, 'memories', 'use_memories');
+    add(
+      'Codex Memory-kontrakt',
+      nativeMemories === false && generateMemories === false && useMemories === false,
+      `[features].memories=${nativeMemories}, [memories].generate_memories=${generateMemories}, use_memories=${useMemories}`
+    );
   } else {
     add('Codex hook-feature', false, 'Codex config findes ikke; runtime-flag er NOT VERIFIED.', 'warn');
+    add('Codex Memory-kontrakt', false, 'Codex config findes ikke; native memory er NOT VERIFIED.', 'warn');
   }
 
   const grokHookFile = path.join(HOME, '.grok', 'hooks', 'ai-memory.json');
@@ -314,13 +329,13 @@ function main() {
 
   const cursorMemory = cursorState('cursor/memoriesEnabled');
   if (cursorMemory.verified) {
-    const cursorPrivacy = cursorState('cursorai/donotchange/privacyMode');
+    const cursorPrivacy = cursorState('cursorai/donotchange/newPrivacyMode2');
     const memoryEnabled = String(cursorMemory.value).toLowerCase() === 'true';
-    const privacyEnabled = cursorPrivacy.verified && String(cursorPrivacy.value).toLowerCase() === 'true';
+    const noStorage = cursorPrivacy.verified && cursorNoStorage(cursorPrivacy.value);
     add(
       'Cursor Memory-kontrakt',
-      !memoryEnabled || privacyEnabled,
-      `cursor/memoriesEnabled=${cursorMemory.value}, privacyMode=${cursorPrivacy.verified ? cursorPrivacy.value : 'NOT VERIFIED'}`
+      !memoryEnabled || noStorage,
+      `cursor/memoriesEnabled=${cursorMemory.value}, privacyMode=${noStorage ? 'PRIVACY_MODE_NO_STORAGE' : 'NOT NO_STORAGE'}`
     );
   } else {
     add('Cursor Memory-kontrakt', false, 'Cursor state database kunne ikke læses; NOT VERIFIED.', 'warn');

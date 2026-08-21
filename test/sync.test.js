@@ -171,7 +171,26 @@ test('doctor reports warnings honestly without writing', () => {
   assert.strictEqual(after, before, 'doctor must stay read-only');
 });
 
-test('Cursor Privacy Mode makes its built-in Memory inactive', {
+test('Cursor no-storage privacy mode makes its built-in Memory inactive', {
+  skip: Number(process.versions.node.split('.')[0]) < 22,
+}, () => {
+  install();
+  const database = p('AppData', 'Roaming', 'Cursor', 'User', 'globalStorage', 'state.vscdb');
+  fs.mkdirSync(path.dirname(database), { recursive: true });
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(database);
+  db.exec('CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)');
+  const insert = db.prepare('INSERT INTO ItemTable (key, value) VALUES (?, ?)');
+  insert.run('cursor/memoriesEnabled', 'true');
+  insert.run('cursorai/donotchange/privacyMode', 'true');
+  insert.run('cursorai/donotchange/newPrivacyMode2', JSON.stringify({ privacyMode: 'PRIVACY_MODE_NO_STORAGE' }));
+  db.close();
+
+  const output = doctor();
+  assert.ok(output.includes('PASS  Cursor Memory-kontrakt'), 'Privacy Mode did not neutralize Cursor Memory');
+});
+
+test('legacy Cursor privacy flag alone does not hide a native-memory fork', {
   skip: Number(process.versions.node.split('.')[0]) < 22,
 }, () => {
   install();
@@ -185,8 +204,9 @@ test('Cursor Privacy Mode makes its built-in Memory inactive', {
   insert.run('cursorai/donotchange/privacyMode', 'true');
   db.close();
 
-  const output = doctor();
-  assert.ok(output.includes('PASS  Cursor Memory-kontrakt'), 'Privacy Mode did not neutralize Cursor Memory');
+  let output = '';
+  try { doctor(); } catch (error) { output = String(error.stdout || ''); }
+  assert.ok(output.includes('FAIL  Cursor Memory-kontrakt'), 'legacy Privacy Mode produced a false PASS');
 });
 
 test('Cursor CLAUDE.md compatibility remains valid project context', {
@@ -512,8 +532,22 @@ test('Cursor session start refreshes the package and injects always-on ADHD cont
 });
 
 test('installer repairs native-memory forks and preserves unrelated config', () => {
+  fs.mkdirSync(p('.codex'), { recursive: true });
   fs.mkdirSync(p('.grok'), { recursive: true });
   fs.mkdirSync(p('.zcode', 'v2'), { recursive: true });
+  put(p('.codex', 'config.toml'), [
+    '[other]',
+    'enabled = true',
+    '',
+    '[features]',
+    'hooks = false',
+    'memories = true',
+    '',
+    '[memories]',
+    'generate_memories = true',
+    'use_memories = true',
+    '',
+  ].join('\n'));
   put(p('.grok', 'config.toml'), [
     '[other]',
     'enabled = true',
@@ -532,6 +566,13 @@ test('installer repairs native-memory forks and preserves unrelated config', () 
   put(p('.zcode', 'v2', 'setting.json'), JSON.stringify({ memoryEnabled: true, keep: 'yes' }));
 
   install();
+
+  const codex = read(p('.codex', 'config.toml'));
+  assert.match(codex, /\[other\]\nenabled = true/);
+  assert.match(codex, /\[features\][\s\S]*?hooks = true/);
+  assert.match(codex, /\[features\][\s\S]*?memories = false/);
+  assert.match(codex, /\[memories\][\s\S]*?generate_memories = false/);
+  assert.match(codex, /\[memories\][\s\S]*?use_memories = false/);
 
   const grok = read(p('.grok', 'config.toml'));
   assert.match(grok, /\[other\]\nenabled = true/);
@@ -662,14 +703,14 @@ test('doctor covers hooks, Kimi, Cursor and native-memory contracts', () => {
   put(path.join(kimiRoot, 'config.json'), JSON.stringify({
     agents: { default: 'main', entries: { main: { workDir: kimiWorkspace } } },
   }));
-  put(p('.codex', 'config.toml'), '[features]\nhooks = true\n');
+  put(p('.codex', 'config.toml'), '[features]\nhooks = true\nmemories = true\n\n[memories]\ngenerate_memories = true\nuse_memories = true\n');
   put(p('.grok', 'config.toml'), '[memory]\nenabled = true\n');
   put(p('.kimi', 'config.toml'), '[models]\nkeep = "yes"\n');
   put(p('.zcode', 'v2', 'setting.json'), JSON.stringify({ memoryEnabled: true }));
   install();
 
   const output = doctor();
-  for (const label of ['Codex hooks', 'Cursor hooks', 'Kimi hooks', 'Kimi Desktop workspace', 'Grok Memory-kontrakt', 'Grok hook-isolation', 'ZCode Memory-kontrakt']) {
+  for (const label of ['Codex hooks', 'Codex Memory-kontrakt', 'Cursor hooks', 'Kimi hooks', 'Kimi Desktop workspace', 'Grok Memory-kontrakt', 'Grok hook-isolation', 'ZCode Memory-kontrakt']) {
     assert.ok(output.includes(label), `doctor skipped ${label}`);
   }
   assert.ok(output.includes('ALIGNED WITH WARNINGS'), 'doctor hid optional runtime warnings');

@@ -209,6 +209,24 @@ function patchGrokConfig(file) {
   }
 }
 
+function patchCodexConfig(file) {
+  const raw = (read(file) || Buffer.from('')).toString('utf8');
+  const targets = [
+    ['features', 'hooks', 'true'],
+    ['features', 'memories', 'false'],
+    ['memories', 'generate_memories', 'false'],
+    ['memories', 'use_memories', 'false'],
+  ];
+  if (!targets.every(([section, key]) => tomlBooleanIsUnambiguous(raw, section, key))) {
+    notes.push('Codex: ambiguous managed TOML — config left untouched.');
+    return;
+  }
+  let wrote = false;
+  for (const [section, key, value] of targets) {
+    wrote = setTomlBoolean(file, section, key, value, 'Codex', !wrote) || wrote;
+  }
+}
+
 function patchCursorHooks(file) {
   if (UNINSTALL && !fs.existsSync(file)) return;
   const config = readJson(file, { version: 1, hooks: {} });
@@ -452,7 +470,7 @@ for (const f of ['INSTRUCTIONS.md', 'CONTEXT.md', 'MEMORY.md']) {
 patchSettings(path.join(CLAUDE, 'settings.json'), 30, '~/.claude/settings.json', CLAUDE_EVENTS);
 
 if (fs.existsSync(CODEX)) {
-  setTomlBoolean(path.join(CODEX, 'config.toml'), 'features', 'hooks', 'true', 'Codex');
+  patchCodexConfig(path.join(CODEX, 'config.toml'));
 } else {
   notes.push('Codex not found — skipped. Install it and run this again.');
 }
