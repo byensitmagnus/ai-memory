@@ -548,6 +548,9 @@ test('Codex install owns the full shared-memory lifecycle without duplicates', (
     assert.strictEqual(ours.length, 1, `${event} has ${ours.length} managed hooks`);
     assert.ok(ours[0].command.startsWith(expectedRuntime), `${event} does not use the active Node runtime`);
   }
+  const sessionEnd = hooks.SessionEnd.flatMap((group) => group.hooks || [])
+    .find((hook) => String(hook.command).includes('.ai-memory/sync.js'));
+  assert.ok(sessionEnd.timeout <= 3, `Codex clamps SessionEnd timeout ${sessionEnd.timeout}s to 3s`);
   assert.ok(JSON.stringify(hooks).includes('echo keep-me'), 'an unrelated Codex hook was removed');
 
   const output = runWithInput(p('.ai-memory', 'sync.js'), ['--codex-context-hook'], JSON.stringify({

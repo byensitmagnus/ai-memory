@@ -232,7 +232,7 @@ function ensureCodexHooks() {
       hooks: [{ type: 'command', command: finishCommand, timeout: 30, statusMessage: 'Saving shared session memory' }],
     },
     SessionEnd: {
-      hooks: [{ type: 'command', command: finishCommand, timeout: 30, statusMessage: 'Saving shared session memory' }],
+      hooks: [{ type: 'command', command: finishCommand, timeout: 3, statusMessage: 'Saving shared session memory' }],
     },
   };
   for (const [event, group] of Object.entries(managed)) {
