@@ -263,6 +263,23 @@ test('doctor accepts bridged skill links as real skills', () => {
   assert.ok(output.includes('PASS  Skill-bridge'), 'doctor rejected the bridged skill link');
 });
 
+test('a plugin skill link left dangling by a version bump is relinked, not fatal', () => {
+  install();
+  const pluginRoot = (version) =>
+    p('.claude', 'plugins', 'cache', 'claude-plugins-official', 'firecrawl', version, 'skills', 'demo');
+  put(path.join(pluginRoot('1.0.0'), 'SKILL.md'), '# demo\n');
+  sync();
+  const link = p('.agents', 'skills', 'demo');
+  assert.equal(fs.readlinkSync(link), pluginRoot('1.0.0'), 'initial link should point at v1.0.0');
+
+  // Simulate a plugin update: old version dir removed, new one takes its place.
+  fs.rmSync(p('.claude', 'plugins', 'cache', 'claude-plugins-official', 'firecrawl', '1.0.0'), { recursive: true });
+  put(path.join(pluginRoot('2.0.0'), 'SKILL.md'), '# demo\n');
+
+  assert.doesNotThrow(() => sync(), 'sync crashed on a dangling skill link instead of relinking it');
+  assert.equal(fs.readlinkSync(link), pluginRoot('2.0.0'), 'stale link was not repointed to the new version');
+});
+
 // --- the memory map ---------------------------------------------------------
 
 test('project memory map exposes bounded hints instead of injecting full indexes', () => {

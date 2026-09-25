@@ -85,19 +85,28 @@ function ensureSkillLink(source, destRoot, counters) {
     return;
   }
 
-  if (fs.existsSync(destination)) {
-    try {
+  let destStat;
+  try { destStat = fs.lstatSync(destination); } catch { destStat = null; }
+  if (destStat) {
+    if (destStat.isSymbolicLink()) {
       const target = fs.readlinkSync(destination);
       const resolved = path.resolve(path.dirname(destination), target);
       if (samePath(resolved, source)) {
         counters.linksCurrent++;
         return;
       }
-    } catch {
-      // Rigtig mappe eller ulæseligt link: bevar den (ingen overwrite).
+      if (!fs.existsSync(resolved)) {
+        // Stale link (e.g. old plugin version removed): safe to relink.
+        fs.unlinkSync(destination);
+      } else {
+        counters.linksSkipped++;
+        return;
+      }
+    } else {
+      // Rigtig mappe: bevar den (ingen overwrite).
+      counters.linksSkipped++;
+      return;
     }
-    counters.linksSkipped++;
-    return;
   }
 
   ensureDir(destRoot);
