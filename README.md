@@ -1,7 +1,3 @@
----
-source: ai
----
-
 # ai-memory
 
 **A small, local control plane for Claude Code, Codex, Grok, Kimi, Cursor and ZCode.**
@@ -210,4 +206,5 @@ generated package stay in place until you choose to remove them.
 
 ## Licence
 
-MIT. Built at [Byens IT](https://www.byens-it.dk) in Denmark.
+MIT. Made by [Magnus Steinmeier Olsen](https://github.com/byensitmagnus), founder of
+[Byens IT](https://www.byens-it.dk), a Danish gaming-PC and IT company.
