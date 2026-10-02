@@ -208,3 +208,7 @@ generated package stay in place until you choose to remove them.
 
 MIT. Made by [Magnus Steinmeier Olsen](https://github.com/byensitmagnus), founder of
 [Byens IT](https://www.byens-it.dk), a Danish gaming-PC and IT company.
+
+## Project walkthrough
+
+[Open the project overview](docs/PROJECT-OVERVIEW.md) for a concise walkthrough, visual flow and status boundaries.
