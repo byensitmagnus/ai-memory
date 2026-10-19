@@ -134,19 +134,6 @@ function cursorNoStorage(value) {
   catch { return false; }
 }
 
-function brokenCursorAdhdHooks() {
-  const root = path.join(HOME, '.cursor', 'plugins', 'cache', 'i-have-adhd', 'i-have-adhd');
-  let versions;
-  try { versions = fs.readdirSync(root, { withFileTypes: true }); }
-  catch { return []; }
-  const broken = [];
-  for (const version of versions) {
-    if (!version.isDirectory()) continue;
-    const file = path.join(root, version.name, 'hooks', 'hooks.json');
-    if (/"command"\s*:\s*"sh\s/i.test(read(file))) broken.push(file);
-  }
-  return broken;
-}
 
 function obsidianVaults() {
   const registries = process.platform === 'win32'
@@ -340,10 +327,6 @@ function main() {
     );
   } else {
     add('Cursor Memory-kontrakt', false, 'Cursor state database kunne ikke læses; NOT VERIFIED.', 'warn');
-  }
-  const brokenAdhd = brokenCursorAdhdHooks();
-  if (brokenAdhd.length) {
-    add('Cursor ADHD-plugin', false, `${brokenAdhd.length} cache-hook(s) bruger den manglende sh-shell; MDC-reglen er stadig aktiv.`, 'warn');
   }
 
   if (fs.existsSync(KIMI_DESKTOP_HOME)) {

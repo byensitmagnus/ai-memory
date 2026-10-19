@@ -20,19 +20,19 @@ in their proper places.
 ## Recommended layout
 
 ```text
-MagnusBrain/                         # private vault, same logical content
+<your-vault>/                        # private vault, same logical content
   00-AI/
     ai-memory/                       # sources + installed ai-memory scripts
     harness/claude/skills/            # private/custom skills if appropriate
     memory/                           # shared durable memory
     project-memory/                   # shared project state
   04-projects/
-  05-decisions/
+    05-decisions/
   90-archive/                         # technical backups; do not live-sync
 ```
 
 Local compatibility paths may be links into the vault, for example
-`~/.ai-memory` → `MagnusBrain/00-AI/ai-memory`. Create those links through a
+`~/.ai-memory` → `<your-vault>/00-AI/ai-memory`. Create those links through a
 checked bootstrap script on each operating system; do not copy files by hand.
 The tool discovers the same logical source on both machines, while each app
 keeps its own local cache and sign-in state.

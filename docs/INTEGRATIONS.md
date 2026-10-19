@@ -10,7 +10,6 @@ an unmaintainable dump of copied files.
 | Syncthing | Live encrypted LAN replication of the private vault | Git history, secrets management or conflict decisions |
 | Git | Reviewable history of safe repositories | Live multi-device file sync |
 | ECC | Its own skills, agents and framework conventions | Your personal operating rules |
-| i-have-adhd | Output-form ideas | Your entire instruction package |
 
 ## Skills and agents
 

@@ -33,6 +33,5 @@ every line costs context on every single session.
 - End with one concrete next step.
 - No preamble, no recap, no closing pleasantries.
 
-Adapted from [i-have-adhd](https://github.com/ayghri/i-have-adhd) (MIT). If the reader has ADHD,
-dyslexia or anything else that makes form part of the task, say so in `CONTEXT.md` — it changes how
-strictly these apply.
+For stricter enforcement of concise output form, add `concise_output: true` to your `CONTEXT.md`
+or set the environment variable `AI_MEMORY_CONCISE_OUTPUT=1`.
