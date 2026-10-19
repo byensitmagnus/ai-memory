@@ -270,14 +270,15 @@ test('a plugin skill link left dangling by a version bump is relinked, not fatal
   put(path.join(pluginRoot('1.0.0'), 'SKILL.md'), '# demo\n');
   sync();
   const link = p('.agents', 'skills', 'demo');
-  assert.equal(fs.readlinkSync(link), pluginRoot('1.0.0'), 'initial link should point at v1.0.0');
+  const normalizeLinkTarget = (target) => target.replace(/[\\/]+$/, '');
+  assert.equal(normalizeLinkTarget(fs.readlinkSync(link)), pluginRoot('1.0.0'), 'initial link should point at v1.0.0');
 
   // Simulate a plugin update: old version dir removed, new one takes its place.
   fs.rmSync(p('.claude', 'plugins', 'cache', 'claude-plugins-official', 'firecrawl', '1.0.0'), { recursive: true });
   put(path.join(pluginRoot('2.0.0'), 'SKILL.md'), '# demo\n');
 
   assert.doesNotThrow(() => sync(), 'sync crashed on a dangling skill link instead of relinking it');
-  assert.equal(fs.readlinkSync(link), pluginRoot('2.0.0'), 'stale link was not repointed to the new version');
+  assert.equal(normalizeLinkTarget(fs.readlinkSync(link)), pluginRoot('2.0.0'), 'stale link was not repointed to the new version');
 });
 
 // --- the memory map ---------------------------------------------------------
