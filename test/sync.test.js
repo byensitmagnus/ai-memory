@@ -270,14 +270,15 @@ test('a plugin skill link left dangling by a version bump is relinked, not fatal
   put(path.join(pluginRoot('1.0.0'), 'SKILL.md'), '# demo\n');
   sync();
   const link = p('.agents', 'skills', 'demo');
-  assert.equal(fs.readlinkSync(link), pluginRoot('1.0.0'), 'initial link should point at v1.0.0');
+  const normalizeLinkTarget = (target) => target.replace(/[\\/]+$/, '');
+  assert.equal(normalizeLinkTarget(fs.readlinkSync(link)), pluginRoot('1.0.0'), 'initial link should point at v1.0.0');
 
   // Simulate a plugin update: old version dir removed, new one takes its place.
   fs.rmSync(p('.claude', 'plugins', 'cache', 'claude-plugins-official', 'firecrawl', '1.0.0'), { recursive: true });
   put(path.join(pluginRoot('2.0.0'), 'SKILL.md'), '# demo\n');
 
   assert.doesNotThrow(() => sync(), 'sync crashed on a dangling skill link instead of relinking it');
-  assert.equal(fs.readlinkSync(link), pluginRoot('2.0.0'), 'stale link was not repointed to the new version');
+  assert.equal(normalizeLinkTarget(fs.readlinkSync(link)), pluginRoot('2.0.0'), 'stale link was not repointed to the new version');
 });
 
 // --- the memory map ---------------------------------------------------------
@@ -573,16 +574,28 @@ test('Codex install owns the full shared-memory lifecycle without duplicates', (
   const output = runWithInput(p('.ai-memory', 'sync.js'), ['--codex-context-hook'], JSON.stringify({
     hook_event_name: 'UserPromptSubmit',
     prompt: 'please fix this',
+  }), { AI_MEMORY_CONCISE_OUTPUT: '1' });
+  const context = JSON.parse(output).hookSpecificOutput.additionalContext;
+  assert.ok(context.includes('CONCISE OUTPUT FORM'), 'Codex did not receive the opt-in concise output form');
+});
+
+test('Codex context hook omits concise output when disabled', () => {
+  fs.mkdirSync(p('.codex'), { recursive: true });
+  install();
+
+  const output = runWithInput(p('.ai-memory', 'sync.js'), ['--codex-context-hook'], JSON.stringify({
+    hook_event_name: 'UserPromptSubmit',
+    prompt: 'please fix this',
   }));
   const context = JSON.parse(output).hookSpecificOutput.additionalContext;
-  assert.ok(context.includes('ADHD'), 'Codex did not receive the always-on output form');
+  assert.ok(!context.includes('CONCISE OUTPUT FORM'), 'Codex injected concise output when disabled');
 });
 
 test('Codex prompt hook reads optional project context from the physical Obsidian source', () => {
-  const source = p('Brain', '00-CLAUDE', 'ai-memory');
+  const source = p('vault', '00-AI', 'ai-memory');
   fs.mkdirSync(source, { recursive: true });
   fs.symlinkSync(source, p('.ai-memory'), 'junction');
-  put(p('Brain', '00-CLAUDE', 'scheduled', 'project-matcher.py'), [
+  put(p('vault', '00-AI', 'scheduled', 'project-matcher.py'), [
     "'use strict';",
     "process.stdout.write('OBSIDIAN_PROJECT_CONTEXT');",
   ].join('\n'));
@@ -597,18 +610,31 @@ test('Codex prompt hook reads optional project context from the physical Obsidia
   assert.ok(context.includes('OBSIDIAN_PROJECT_CONTEXT'), 'the physical vault project matcher was not used');
 });
 
-test('Cursor session start refreshes the package and injects always-on ADHD context', () => {
+test('Cursor session start refreshes the package and injects opt-in concise output', () => {
   fs.mkdirSync(p('.cursor'), { recursive: true });
   install();
   put(p('.ai-memory', 'MEMORY.md'), '# Fresh from Obsidian\n\nCURSOR_FRESH_MEMORY\n');
+  put(p('.ai-memory', 'CONTEXT.md'), '# Context\n\nconcise_output: true\n');
 
   const output = runWithInput(p('.ai-memory', 'sync.js'), ['--cursor-context-hook'], JSON.stringify({
     hook_event_name: 'sessionStart',
     session_id: 'cursor-session-1',
   }));
   const response = JSON.parse(output);
-  assert.ok(response.additional_context.includes('ADHD'), 'Cursor did not receive the always-on output form');
+  assert.ok(response.additional_context.includes('CONCISE OUTPUT FORM'), 'Cursor did not receive the opt-in concise output form');
   assert.ok(read(p('.cursor', 'rules', '00-ai-memory.mdc')).includes('CURSOR_FRESH_MEMORY'), 'Cursor package stayed stale');
+});
+
+test('Cursor session start omits concise output when not configured', () => {
+  fs.mkdirSync(p('.cursor'), { recursive: true });
+  install();
+
+  const output = runWithInput(p('.ai-memory', 'sync.js'), ['--cursor-context-hook'], JSON.stringify({
+    hook_event_name: 'sessionStart',
+    session_id: 'cursor-session-1',
+  }));
+  const response = JSON.parse(output);
+  assert.strictEqual(response.additional_context, '', 'Cursor injected concise output when not configured');
 });
 
 test('installer repairs native-memory forks and preserves unrelated config', () => {

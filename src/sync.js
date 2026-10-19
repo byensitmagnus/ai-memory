@@ -243,13 +243,20 @@ function ensureCodexHooks() {
   return writeIfChanged(CODEX_HOOKS, JSON.stringify(config, null, 2));
 }
 
-const ADHD_CONTEXT = [
-  'OUTPUT FORM (always on for an ADHD reader):',
+const CONCISE_OUTPUT_FORM = [
+  'CONCISE OUTPUT FORM:',
   '1. Put the next action in the first line; no introduction.',
   '2. Number multi-step work; one bounded action per step.',
   '3. Use at most five bullets per list and short text blocks.',
   '4. State current status and finish with one next step under two minutes.',
 ].join('\n');
+
+function conciseOutputEnabled() {
+  if (process.env.AI_MEMORY_CONCISE_OUTPUT === '1') return true;
+  if (process.env.AI_MEMORY_CONCISE_OUTPUT === '0') return false;
+  const context = readSafe(CONTEXT);
+  return /^concise[_-]?output\s*[:=]\s*true/im.test(context);
+}
 
 function readHookEvent() {
   try { return JSON.parse(fs.readFileSync(0, 'utf8') || '{}'); }
@@ -296,7 +303,7 @@ function runCodexContextHook() {
   const event = readHookEvent();
   if (event.hook_event_name !== 'UserPromptSubmit' && event.hook_event_name !== 'SubagentStart') return;
   const context = [
-    ADHD_CONTEXT,
+    ...(conciseOutputEnabled() ? [CONCISE_OUTPUT_FORM] : []),
     ...(event.hook_event_name === 'UserPromptSubmit' ? [projectContext(event.prompt || event.user_prompt)] : []),
   ].filter(Boolean).join('\n\n');
   process.stdout.write(JSON.stringify({
@@ -309,13 +316,14 @@ function runCodexContextHook() {
 
 /** Kimi appends successful hook stdout directly to the model context. */
 function runKimiContextHook() {
-  process.stdout.write(ADHD_CONTEXT);
+  if (conciseOutputEnabled()) process.stdout.write(CONCISE_OUTPUT_FORM);
 }
 
 /** Cursor sessionStart refreshes the package before injecting its context. */
 function runCursorContextHook() {
   main();
-  process.stdout.write(JSON.stringify({ additional_context: ADHD_CONTEXT }));
+  const context = conciseOutputEnabled() ? CONCISE_OUTPUT_FORM : '';
+  process.stdout.write(JSON.stringify({ additional_context: context }));
 }
 
 function pad(n) { return String(n).padStart(2, '0'); }

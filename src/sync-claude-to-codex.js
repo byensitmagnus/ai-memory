@@ -71,8 +71,12 @@ function hasSkill(dir) {
   return fs.existsSync(path.join(dir, 'SKILL.md'));
 }
 
+function normalizePath(p) {
+  return path.resolve(p).replace(/[\\/]+$/, '');
+}
+
 function samePath(a, b) {
-  return path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+  return normalizePath(a).toLowerCase() === normalizePath(b).toLowerCase();
 }
 
 function ensureSkillLink(source, destRoot, counters) {

@@ -1,33 +1,46 @@
 # ai-memory
 
-**A small, local control plane for Claude Code, Codex, Grok, Kimi, Cursor and ZCode.**
+[![CI](https://github.com/byensitmagnus/ai-memory/actions/workflows/test.yml/badge.svg)](https://github.com/byensitmagnus/ai-memory/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js 18+](https://img.shields.io/badge/node-18%2B-brightgreen.svg)](https://nodejs.org)
 
-Write your working rules once. `ai-memory` renders the same package into all
-six local harnesses, carries bounded session metadata across them, and keeps reusable
-skills, agents and project instructions aligned. It is dependency-free Node.js
-and has no network calls or telemetry.
+> Write your rules once — render byte-identical instructions into Claude Code, Codex, Cursor, Grok, Kimi and ZCode. `doctor.js` tells you exactly what drifted, without touching files. No network calls, no telemetry.
 
-This repository is the **portable engine**. Your real business context,
-project notes, credentials and personal memory remain in a private vault —
-never in this public repository.
+## Quickstart
 
-## Exactly which AI repository to use
+```bash
+git clone https://github.com/byensitmagnus/ai-memory.git
+node ai-memory/install.js --check   # preview changes
+node ai-memory/install.js           # install
+node ai-memory/install.js --doctor  # verify
+```
 
-| Repository | Use it when | Do not use it for | Canonical content |
-| --- | --- | --- | --- |
-| **`ai-memory` (this repository)** | The change is generic harness infrastructure that should work without Magnus or Byens IT context: installer, sync, hooks, doctor, privacy boundaries or cross-tool adapters. | Business facts, personal memory, company-selected skills, onboarding or SiteSmith product work. | Portable runtime code and neutral tests for Claude Code, Codex, Grok, Kimi, Cursor and ZCode. |
-| `magnusbrain` (private) | The information is specific to Magnus or Byens IT: goals, projects, decisions, memory, business context or custom operating rules. | Reusable neutral runtime code. | The private source of truth consumed by local AI tools. |
-| `byens-ai-setup` (private) | A Byens IT teammate must receive an approved bundle of company rules, skills, agents, MCP configuration or team memory. | Magnus' personal vault or invention of generic engine behavior. | Team distribution and onboarding; its engine snapshot is refreshed from `ai-memory`. |
-| [`sitesmith`](https://github.com/byensitmagnus/sitesmith) | The change develops or releases the SiteSmith website-building product itself. | General AI memory, company onboarding or private context. | SiteSmith skill source, browser verifier, benchmarks and releases. |
+## Supported tools
 
-Decision rule: generic multi-harness runtime changes start here. Private data
-goes to `magnusbrain`; team packaging goes to `byens-ai-setup`; SiteSmith product
-changes go to `sitesmith`. The archived `byens-brain` repository is history only
-and must never receive new work.
+| Tool | Home package | Session import | Native hooks | Memory disabled |
+|------|:------------:|:--------------:|:------------:|:---------------:|
+| Claude Code | ✅ | ✅ | ✅ | — |
+| Codex | ✅ | ✅ | ✅ | ✅ |
+| Cursor | ✅ | ✅ | ✅ | ✅ |
+| Grok | ✅ | ✅ | ✅ | ✅ |
+| Kimi | ✅ | ✅ | ✅ | — |
+| ZCode | ✅ | ✅ | ✅ | ✅ |
 
-Change direction: `ai-memory` → the engine snapshot in `magnusbrain` and
-`byens-ai-setup`. Never patch those snapshots first and leave the portable
-engine behind.
+## What it does
+
+- **Byte-identical home packages** — write `INSTRUCTIONS.md`, `CONTEXT.md` and `MEMORY.md` once; they render to all six local AI tools
+- **Cross-tool session recall** — imports bounded session metadata (never raw prompts) from each tool into a shared store
+- **Skill/agent bridge** — makes Claude-compatible skills, agents and commands available to all harnesses
+- **Drift detection** — `doctor.js` is a read-only health check that reports exactly what broke
+
+## Repository layout
+
+This repository is the **public engine** — portable scripts, neutral templates
+and tests. Keep private or personal context (business rules, goals, memory,
+credentials) in a separate private repository or Obsidian vault.
+
+The engine snapshot in your private vault is refreshed from this repository.
+Never patch the private copy first and leave the public engine behind.
 
 ```text
 Private Obsidian vault                 Local AI installations
@@ -83,6 +96,22 @@ Run a read-only check any time:
 ```bash
 node ~/.ai-memory/doctor.js
 # or: node ai-memory/install.js --doctor
+```
+
+Example output:
+
+```text
+PASS  Kilde: INSTRUCTIONS.md — /home/user/.ai-memory/INSTRUCTIONS.md
+PASS  Kilde: MEMORY.md — /home/user/.ai-memory/MEMORY.md
+PASS  Bridge-script — /home/user/.ai-memory/sync-claude-to-codex.js
+PASS  Pakke: Claude Code — /home/user/.claude/CLAUDE.md
+PASS  Pakke: Codex — /home/user/.codex/AGENTS.md
+PASS  6 byte-identiske pakker — SHA-256 a1b2c3...
+PASS  Claude hooks — SessionStart=1, Stop=1, SessionEnd=1
+PASS  Codex Memory-kontrakt — [features].memories=false, ...
+WARN  Kimi runtime-bevis — Ingen frisk lifecycle-evidens endnu.
+
+ALIGNED WITH WARNINGS (1)
 ```
 
 Expected finish: `100% ALIGNED`, or `ALIGNED WITH WARNINGS` when optional
@@ -163,8 +192,6 @@ The engine is intentionally compatible with a wider stack rather than trying
 to own it all:
 
 - [ECC](https://github.com/affaan-m/ecc) for a curated skill/agent framework.
-- [i-have-adhd](https://github.com/ayghri/i-have-adhd) for concise,
-  action-first output rules.
 - Obsidian for visible, editable long-term memory.
 - Syncthing for direct, encrypted LAN replication between machines.
 
